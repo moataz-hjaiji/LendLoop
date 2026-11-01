@@ -16,18 +16,18 @@ What I would change, most important first.
 
 ## Rate limiting and abuse
 
-- Rate limit at the edge on the n8n webhook and on `/n8n/*` routes. Today every forged webhook writes an error row, so an attacker could flood the log. Aggregate repeated rejections into one alert.
+- Rate limit at the edge on the n8n webhook and on `/n8n/*` routes. Rejections already share one error row per minute, but each one still runs a workflow and a log line.
 - Rate limit mutations per user (the Convex rate limiter component), especially `loans.request`.
 
 ## Replay
 
 - Store seen signatures for the 5-minute window to reject replays outright. Today idempotency makes them harmless rather than rejected.
-- Sign the method and path as well as the timestamp and body, so a signature is valid for only one route.
+- Sign the method and path on the Convex to n8n direction too (n8n to Convex already does).
 - Sign responses too, or rely on TLS plus pinning, for the overdue feed.
 
 ## Queueing and delivery
 
-- Replace the chain of scheduled retries with an outbox table and a Convex cron that re-drives anything stuck in `queued` or `sending`. An action that crashes mid-run currently leaves a visible row but no automatic recovery.
+- Replace the chain of scheduled retries with an outbox table that re-drives stuck notifications automatically. Today a cron marks rows stuck in `queued` or `sending` as `failed` after 15 minutes, which makes them visible but does not resend them.
 - Add a dead-letter view with a "retry" button.
 - Use a real email provider with its own idempotency key, and handle bounce webhooks. Provider-side keys would also close the gap between claim and send.
 - Paginate the overdue feed and batch sends.
@@ -59,5 +59,5 @@ What I would change, most important first.
 
 - Store a timezone per neighborhood so overdue status follows local midnight.
 - Add pagination, and auto-decline overlapping requests on approval.
-- Add CI running tests, typecheck, lint and `check:secrets` on each push, plus Playwright end-to-end tests.
+- Add Playwright end-to-end tests to the existing CI.
 - Separate dev, staging and production deployments, each with its own secrets.

@@ -87,7 +87,7 @@ The **Admin > Automation** page updates live while you run these.
 | Overdue reminders | `npm run n8n:overdue` | Bob's reminder is `sent`; Dana's is `failed` (a simulated bounce) |
 | Error workflow | The same run | A `workflow_error` row for the failed run |
 | Idempotent re-run | `npm run n8n:overdue` again | Only Dana's loan is processed; Bob is not reminded twice |
-| Forged signature | `npm run n8n:webhook -- forged` | HTTP 401 and a `workflow_error` row |
+| Forged signature | `npm run n8n:webhook -- forged` | HTTP 401 and a `workflow_error` row. Rejections share one row per minute, so a flood cannot fill the log |
 | Stale timestamp | `npm run n8n:webhook -- stale` | HTTP 401 |
 | Exact-bytes check | `npm run n8n:webhook -- reserialized` | HTTP 401, because it is the same JSON in different bytes |
 | Tampered body | `npm run n8n:webhook -- tampered` | HTTP 401 |
@@ -172,9 +172,12 @@ Admins moderate but do not act on other people's loans. Only the lender marks a 
 ### HMAC signing
 
 ```
-signature = hex( HMAC-SHA256( secret, "<unix seconds>." + <raw body bytes> ) )
-headers:    x-lendloop-timestamp, x-lendloop-signature
+Convex to n8n:  signature = hex( HMAC-SHA256( secret, "<unix seconds>." + <raw body bytes> ) )
+n8n to Convex:  signature = hex( HMAC-SHA256( secret, "<unix seconds>.<METHOD> <path>." + <raw body bytes> ) )
+headers:        x-lendloop-timestamp, x-lendloop-signature
 ```
+
+n8n calls more than one Convex route, so those requests also sign the method and path: a captured request cannot be replayed against another endpoint. Convex calls a single n8n webhook, and each direction has its own secret.
 
 | Property | How |
 |---|---|
@@ -223,13 +226,15 @@ Secrets live in `.env` (gitignored), Convex environment variables and n8n creden
 
 `shouldApply` in `automationState.ts` is the whole rule: only one caller can win `sending`, `sent` is final, and `failed` can be claimed again.
 
-**At-most-once sending.** A claim is recorded before sending. If n8n dies between the claim and the send, that reminder is skipped until the next day's key, and the row stays visibly `sending` on the Admin page. For a reminder, one missed day is better than a duplicate. Convex mutations are serializable, so two claims cannot both win.
+**Claim before sending.** A claim is recorded before sending, and Convex mutations are serializable, so two claims cannot both win.
+
+**Stuck rows recover.** If n8n dies between the claim and the write-back, or a delivery action crashes, a row could stay `queued` or `sending`. A Convex cron (`convex/crons.ts`) runs every 15 minutes and marks rows stuck for over 15 minutes as `failed`, with the reason, so they show on the Admin page and the next run can claim them again. For a reminder stuck in `sending` the outcome is unknown, so a re-run can repeat it once; one possible duplicate is better than a reminder lost without trace.
 
 **Retries**
 
 | Path | Strategy |
 |---|---|
-| Convex to n8n | 5 attempts over about 3 minutes, exponential with jitter, re-signed each time. Then the event is marked `failed` |
+| Convex to n8n | 5 attempts over about 3 minutes, exponential with jitter, re-signed each time. A 4xx other than 408 or 429 (for example 401 from a secret mismatch) is not retried. Then the event is marked `failed` |
 | n8n to Convex | 4 attempts at 2s, 4s and 8s, re-signed each time. A 4xx other than 408 or 429 fails at once, as a retry cannot help. Then the run fails |
 
 n8n's built-in Retry On Fail waits a fixed interval, so backoff is a small loop in the Signed Request sub-workflow.
@@ -252,6 +257,7 @@ n8n's built-in Retry On Fail waits a fixed interval, so backoff is a small loop 
 | `CONVEX_TO_N8N_SECRET` | `.env`, Convex, n8n credential | both | Signs Convex to n8n |
 | `N8N_TO_CONVEX_SECRET` | `.env`, Convex, n8n credential | both | Signs n8n to Convex |
 | `N8N_ENCRYPTION_KEY` | `.env` | n8n | Encrypts credentials at rest |
+| `CONVEX_SITE_URL` | `.env` (optional) | `npm run n8n:import` | Where n8n reaches Convex's HTTP routes. Defaults to `http://host.docker.internal:3211` |
 
 To rotate an HMAC secret, change it in `.env`, then run `npm run convex:env` and `npm run n8n:import`.
 
@@ -260,7 +266,7 @@ To rotate an HMAC secret, change it in `.env`, then run `npm run convex:env` and
 This repo runs Convex locally so that everything works with no tunnel. With a cloud Convex deployment:
 
 - Convex cannot reach `localhost`, so n8n needs a public HTTPS URL. For testing, a tunnel works (`cloudflared tunnel --url http://localhost:5678`). Set `N8N_REQUEST_WEBHOOK_URL` to it.
-- Update `CONVEX_SITE_URL` in the **Prepare** node of `n8n/workflows/signed-request.json` to your `https://<deployment>.convex.site` URL, then rerun `npm run n8n:import`. It is the only place that address appears.
+- Set `CONVEX_SITE_URL` in `.env` to your `https://<deployment>.convex.site` URL, then rerun `npm run n8n:import`. The workflow files hold a placeholder that the import fills in.
 
 See [PRODUCTION.md](PRODUCTION.md) for what else would change.
 
@@ -273,6 +279,10 @@ docker compose exec -T n8n n8n export:workflow --id=<id> --pretty --output=/tmp/
 docker compose cp n8n:/tmp/workflow.json n8n/workflows/<name>.json
 npm run check:secrets
 ```
+
+An export of the Signed Request workflow carries the real Convex address. `check:secrets` flags it; set `CONVEX_SITE_URL` in the Prepare node back to `'__CONVEX_SITE_URL__'`.
+
+CI (`.github/workflows/ci.yml`) runs the typecheck, lint, tests and `check:secrets` on every push.
 
 ## Scope and known limits
 
