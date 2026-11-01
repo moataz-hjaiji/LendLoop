@@ -10,8 +10,9 @@ type Activity = LoanRow["activity"][number];
 
 const KIND_LABEL = { notification: "Notification", reminder: "Reminder", workflow_error: "Workflow" };
 
-function activityText({ kind, status, updatedAt }: Activity) {
-  return `${KIND_LABEL[kind]} ${status} ${formatDistanceToNow(updatedAt, { addSuffix: true })}`;
+function activityText({ kind, status, updatedAt, about }: Activity) {
+  const subject = about ? `${KIND_LABEL[kind]} (${about})` : KIND_LABEL[kind];
+  return `${subject} ${status} ${formatDistanceToNow(updatedAt, { addSuffix: true })}`;
 }
 
 function StatusBadge({ loan }: { loan: LoanRow }) {

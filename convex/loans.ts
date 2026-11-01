@@ -155,7 +155,14 @@ async function withDetails(ctx: QueryCtx, loan: Doc<"loans">) {
     borrowerName: borrower?.name ?? "Unknown",
     borrowerEmail: shareContact ? borrower?.email : undefined,
     overdue: loan.status === "approved" && loan.endDate < todayUtc(),
-    activity: events.map(({ _id, kind, status, updatedAt }) => ({ _id, kind, status, updatedAt })),
+    activity: events.map(({ _id, kind, status, updatedAt, idempotencyKey }) => ({
+      _id,
+      kind,
+      status,
+      updatedAt,
+      // Keys look like notify:<loanId>:<loan status>, which says what the message was about.
+      about: kind === "notification" ? idempotencyKey.split(":")[2] : undefined,
+    })),
   };
 }
 

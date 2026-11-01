@@ -18,9 +18,10 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tool?: Doc<"tools">;
+  onCreated?: () => void;
 };
 
-export function ToolFormDialog({ open, onOpenChange, tool }: Props) {
+export function ToolFormDialog({ open, onOpenChange, tool, onCreated }: Props) {
   const createTool = useMutation(api.tools.create);
   const updateTool = useMutation(api.tools.update);
   const [name, setName] = useState(tool?.name ?? "");
@@ -41,6 +42,7 @@ export function ToolFormDialog({ open, onOpenChange, tool }: Props) {
       toast.success(tool ? "Listing updated" : "Tool listed");
       onOpenChange(false);
       if (!tool) {
+        onCreated?.();
         setName("");
         setDescription("");
       }

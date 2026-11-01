@@ -79,7 +79,8 @@ export default function ToolsPage() {
       </ul>
 
       {borrowing && <BorrowDialog tool={borrowing} onClose={() => setBorrowing(undefined)} />}
-      <ToolFormDialog open={listing} onOpenChange={setListing} />
+      {/* Clear the filter so a new tool in another category is not hidden. */}
+      <ToolFormDialog open={listing} onOpenChange={setListing} onCreated={() => setCategory(undefined)} />
     </>
   );
 }
