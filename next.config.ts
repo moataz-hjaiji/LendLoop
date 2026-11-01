@@ -2,6 +2,14 @@ import type { NextConfig } from "next";
 
 // Baseline headers that cannot break Clerk or Convex. A full CSP is in PRODUCTION.md.
 const nextConfig: NextConfig = {
+  turbopack: {
+    rules: {
+      "*.css": {
+        loaders: ["@tailwindcss/turbopack"],
+        as: "*.css",
+      },
+    },
+  },
   async headers() {
     return [
       {
