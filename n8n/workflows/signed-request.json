@@ -43,7 +43,7 @@
       "parameters": {
         "mode": "runOnceForEachItem",
         "language": "javaScript",
-        "jsCode": "// npm run n8n:import replaces this placeholder with CONVEX_SITE_URL from .env, so the\n// address is configuration, not part of the export. Env access stays blocked in n8n.\nconst CONVEX_SITE_URL = '__CONVEX_SITE_URL__';\n\n// Called again on each retry, so every attempt gets a fresh timestamp and signature.\nconst body = $json.body ?? '';\nconst timestamp = String(Math.floor(Date.now() / 1000));\nreturn {\n  method: $json.method,\n  url: CONVEX_SITE_URL + $json.path,\n  path: $json.path,\n  body,\n  context: $json.context ?? null,\n  attempt: ($json.attempt ?? 0) + 1,\n  timestamp,\n  // Must match convex/lib/hmac.ts: the route is signed too, so a captured request\n  // cannot be replayed against another endpoint.\n  signingInput: `${timestamp}.${$json.method} ${$json.path}.${body}`,\n};"
+        "jsCode": "// Filled in by npm run n8n:import from CONVEX_SITE_URL.\nconst CONVEX_SITE_URL = '__CONVEX_SITE_URL__';\n\n// Runs again on each retry, so each attempt is freshly signed.\nconst body = $json.body ?? '';\nconst timestamp = String(Math.floor(Date.now() / 1000));\nreturn {\n  method: $json.method,\n  url: CONVEX_SITE_URL + $json.path,\n  path: $json.path,\n  body,\n  context: $json.context ?? null,\n  attempt: ($json.attempt ?? 0) + 1,\n  timestamp,\n  // Must match convex/lib/hmac.ts.\n  signingInput: `${timestamp}.${$json.method} ${$json.path}.${body}`,\n};"
       }
     },
     {
@@ -131,7 +131,7 @@
       "parameters": {
         "mode": "runOnceForEachItem",
         "language": "javaScript",
-        "jsCode": "// n8n's built-in Retry On Fail waits a fixed interval, so backoff is done here: 2s, 4s, 8s.\nconst MAX_ATTEMPTS = 4;\nconst request = $('Prepare').last().json;\nconst message = $json.error?.message ?? JSON.stringify($json.error ?? $json);\n// A 4xx will fail the same way every time, except timeouts and rate limits.\nconst permanent = /^4\\d\\d\\b/.test(message) && !/^(408|429)\\b/.test(message);\nif (permanent || request.attempt >= MAX_ATTEMPTS) {\n  throw new Error(`${request.method} ${request.path} failed after ${request.attempt} attempt(s): ${message}`);\n}\nconsole.log(`[signed-request] ${request.path} attempt ${request.attempt} failed: ${message}`);\nreturn {\n  method: request.method,\n  path: request.path,\n  body: request.body,\n  context: request.context,\n  attempt: request.attempt,\n  waitSeconds: 2 ** request.attempt,\n};"
+        "jsCode": "// Backoff: 2s, 4s, 8s (Retry On Fail only supports a fixed wait).\nconst MAX_ATTEMPTS = 4;\nconst request = $('Prepare').last().json;\nconst message = $json.error?.message ?? JSON.stringify($json.error ?? $json);\n// Don't retry a 4xx, except 408 and 429.\nconst permanent = /^4\\d\\d\\b/.test(message) && !/^(408|429)\\b/.test(message);\nif (permanent || request.attempt >= MAX_ATTEMPTS) {\n  throw new Error(`${request.method} ${request.path} failed after ${request.attempt} attempt(s): ${message}`);\n}\nconsole.log(`[signed-request] ${request.path} attempt ${request.attempt} failed: ${message}`);\nreturn {\n  method: request.method,\n  path: request.path,\n  body: request.body,\n  context: request.context,\n  attempt: request.attempt,\n  waitSeconds: 2 ** request.attempt,\n};"
       }
     },
     {

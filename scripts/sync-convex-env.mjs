@@ -1,5 +1,4 @@
 // Copies only the variables Convex needs from .env to the Convex deployment.
-// N8N_ENCRYPTION_KEY deliberately stays behind: Convex has no reason to hold it.
 import { execFileSync } from "node:child_process";
 
 const NEEDED = [

@@ -21,11 +21,7 @@ const TOOLS: { owner: keyof typeof USERS; name: string; category: Category; cond
   { owner: "bob", name: "4-person tent", category: "camping", condition: "good", description: "Waterproof, sets up in ten minutes." },
 ];
 
-/**
- * Demo data: npx convex run seed:run
- * Internal, so only someone with deployment access can run it. Seeded users have no
- * Clerk login; you sign in as yourself and see their data as an admin.
- */
+// Demo data: npx convex run seed:run (seeded users have no Clerk login).
 export const run = internalMutation({
   args: {},
   handler: async (ctx) => {
@@ -44,7 +40,7 @@ export const run = internalMutation({
       toolIds[tool.name] = await ctx.db.insert("tools", { ...tool, ownerId: ids[owner] });
     }
 
-    // Inserted directly: the app rightly refuses to create a loan with past dates.
+    // Inserted directly, since the app refuses past dates.
     const overdue = (toolName: string, borrowerId: (typeof ids)["bob"], daysLate: number) =>
       ctx.db.insert("loans", {
         toolId: toolIds[toolName],

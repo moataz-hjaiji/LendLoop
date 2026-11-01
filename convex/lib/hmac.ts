@@ -1,18 +1,5 @@
-/**
- * HMAC-SHA256 signing shared by both directions of the Convex <-> n8n link.
- *
- *   signature = hex( HMAC-SHA256( secret, "<unix seconds>." + <raw body bytes> ) )
- *
- * n8n -> Convex requests also sign their route, "<unix seconds>.<METHOD> <path>." + body,
- * so a captured request cannot be replayed against a different endpoint. Convex -> n8n
- * has a single webhook and keeps the shorter form; each direction has its own secret.
- *
- * The timestamp is inside the signed bytes, so it cannot be changed to refresh an
- * old request. We sign bytes rather than parsed JSON because re-serializing can
- * reorder keys or change whitespace, which would change the signature.
- *
- * Uses Web Crypto, available in Convex and in Node, so tests run the real code.
- */
+// HMAC-SHA256 over "<timestamp>." + raw body bytes. n8n -> Convex calls also sign
+// "<METHOD> <path>." so a signature only works for one route. See README "HMAC signing".
 
 export const TIMESTAMP_HEADER = "x-lendloop-timestamp";
 export const SIGNATURE_HEADER = "x-lendloop-signature";
@@ -74,7 +61,7 @@ export async function verifyPayload(args: {
   if (Math.abs(now - Number(timestamp)) > TOLERANCE_SECONDS) return { ok: false, reason: "stale" };
 
   const expected = Uint8Array.from(signature.match(/../g)!, (byte) => parseInt(byte, 16));
-  // subtle.verify compares in constant time, so we never hand-roll the comparison.
+  // subtle.verify is constant time.
   const valid = await crypto.subtle.verify(
     "HMAC",
     await importKey(secret, "verify"),

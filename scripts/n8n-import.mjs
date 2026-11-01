@@ -1,5 +1,4 @@
-// Loads credentials and workflows into the running n8n container, then publishes them.
-// Credentials come from .env over stdin, so secrets never appear in a file in this repo.
+// Imports credentials (from .env, over stdin) and workflows into n8n, then publishes them.
 import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 
@@ -20,7 +19,6 @@ inContainer(
   "umask 077; cat > /tmp/credentials.json; n8n import:credentials --input=/tmp/credentials.json; status=$?; rm -f /tmp/credentials.json; exit $status",
   JSON.stringify(credentials),
 );
-// Workflows hold a placeholder for Convex's address, filled in here so it stays configuration.
 const convexSiteUrl = env.CONVEX_SITE_URL || "http://host.docker.internal:3211";
 for (const name of readdirSync("n8n/workflows").filter((file) => file.endsWith(".json"))) {
   const workflow = readFileSync(`n8n/workflows/${name}`, "utf8").replaceAll("__CONVEX_SITE_URL__", convexSiteUrl);

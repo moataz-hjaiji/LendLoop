@@ -52,11 +52,7 @@ export const recordActivity = internalMutation({
 
 export const STUCK_AFTER_MS = 15 * 60_000;
 
-/**
- * Runs from a cron. A crash between claim and write-back, or a delivery action that dies
- * mid-run, would otherwise leave a row "queued" or "sending" forever. Marking it failed
- * makes it visible on the Admin page and lets a later run claim it again.
- */
+// Cron: rows stuck in "queued" or "sending" become "failed", so they show up and can be retried.
 export const expireStuck = internalMutation({
   args: {},
   handler: async (ctx) => {
@@ -81,15 +77,14 @@ export const expireStuck = internalMutation({
   },
 });
 
-// `today` is an argument because Convex caches query results and passing time does not
-// refresh them. With Date.now() here, the daily run could receive yesterday's list.
+// `today` is passed in because cached query results don't refresh as time passes.
 export const overdueLoans = internalQuery({
   args: { today: v.string() },
   handler: async (ctx, { today }) => {
     const overdue = await ctx.db
       .query("loans")
       .withIndex("by_status_endDate", (q) => q.eq("status", "approved").lt("endDate", today))
-      .take(200); // Oldest 200 only. Paginate if a run could ever exceed that.
+      .take(200); // no pagination yet
 
     const rows = await Promise.all(
       overdue.map(async (loan) => {

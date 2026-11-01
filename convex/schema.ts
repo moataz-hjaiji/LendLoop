@@ -11,7 +11,7 @@ import {
 
 export default defineSchema({
   users: defineTable({
-    // Clerk's stable identity (issuer + subject), taken only from the verified JWT.
+    // From the verified Clerk JWT.
     tokenIdentifier: v.string(),
     name: v.string(),
     email: v.string(),
@@ -27,20 +27,18 @@ export default defineSchema({
     category: categoryValidator,
     condition: conditionValidator,
     description: v.string(),
-    // Soft delete: loan history must keep pointing at a real tool.
+    // Soft delete, so loan history keeps its tool.
     removedAt: v.optional(v.number()),
   })
     .index("by_owner", ["ownerId"])
     .index("by_removed_category", ["removedAt", "category"]),
 
-  // A loan starts life as a request (status "pending"), so there is one row and
-  // one lifecycle rather than two tables to keep in sync.
+  // A request is a loan with status "pending".
   loans: defineTable({
     toolId: v.id("tools"),
-    ownerId: v.id("users"), // denormalized from the tool for the "incoming" index
+    ownerId: v.id("users"), // copied from the tool for the "incoming" index
     borrowerId: v.id("users"),
-    // YYYY-MM-DD: a due date is a calendar day, not an instant. These sort
-    // lexicographically, so range checks are plain string comparisons.
+    // YYYY-MM-DD, so string comparison works for ranges.
     startDate: v.string(),
     endDate: v.string(),
     status: loanStatusValidator,
@@ -50,8 +48,7 @@ export default defineSchema({
     .index("by_owner", ["ownerId"])
     .index("by_status_endDate", ["status", "endDate"]),
 
-  // Idempotency ledger for everything n8n does, and the source of the
-  // "Reminder sent 2 days ago" activity shown on each loan.
+  // Idempotency ledger for n8n, also shown as activity on each loan.
   automationEvents: defineTable({
     idempotencyKey: v.string(),
     kind: eventKindValidator,

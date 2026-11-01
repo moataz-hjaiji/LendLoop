@@ -113,7 +113,7 @@
       "parameters": {
         "mode": "runOnceForEachItem",
         "language": "javaScript",
-        "jsCode": "// Key is loanId + date, set by Convex: at most one reminder per loan per day, however many times this runs.\nreturn {\n  method: 'POST',\n  path: '/n8n/activity',\n  body: JSON.stringify({ idempotencyKey: $json.idempotencyKey, kind: 'reminder', status: 'sending', loanId: $json.loanId }),\n  context: $json,\n};"
+        "jsCode": "// Key is loanId + date: at most one reminder per loan per day.\nreturn {\n  method: 'POST',\n  path: '/n8n/activity',\n  body: JSON.stringify({ idempotencyKey: $json.idempotencyKey, kind: 'reminder', status: 'sending', loanId: $json.loanId }),\n  context: $json,\n};"
       }
     },
     {
@@ -221,7 +221,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "// Runs after every item has been written back, so one bad recipient does not stop the\n// others. Throwing here marks the run failed, which triggers the Error Workflow.\nconst failed = $input.all().filter((item) => item.json.context.delivered === false);\nif (failed.length > 0) {\n  throw new Error(`${failed.length} of ${$input.all().length} reminder(s) failed: ${failed.map((item) => item.json.context.idempotencyKey).join(', ')}`);\n}\nreturn [{ json: { sent: $input.all().length } }];"
+        "jsCode": "// Fail the run after all write-backs so the Error Workflow fires.\nconst failed = $input.all().filter((item) => item.json.context.delivered === false);\nif (failed.length > 0) {\n  throw new Error(`${failed.length} of ${$input.all().length} reminder(s) failed: ${failed.map((item) => item.json.context.idempotencyKey).join(', ')}`);\n}\nreturn [{ json: { sent: $input.all().length } }];"
       }
     }
   ],

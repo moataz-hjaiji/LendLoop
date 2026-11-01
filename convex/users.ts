@@ -12,7 +12,7 @@ export const store = mutation({
     const email = identity.email ?? "";
     const existing = await getCurrentUser(ctx);
     if (existing) {
-      // Role and trust are never touched here: they only change through the admin paths.
+      // Role and trust only change through admin functions.
       if (existing.name !== name || existing.email !== email) {
         await ctx.db.patch(existing._id, { name, email });
       }
@@ -60,10 +60,7 @@ export const setTrustedLender = mutation({
   },
 });
 
-/**
- * Bootstraps the first admin. Internal, so browsers cannot call it; running it needs
- * deployment access: npx convex run users:promoteToAdmin '{"email":"you@example.com"}'
- */
+// Internal: npx convex run users:promoteToAdmin '{"email":"you@example.com"}'
 export const promoteToAdmin = internalMutation({
   args: { email: v.string() },
   handler: async (ctx, { email }) => {

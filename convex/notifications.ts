@@ -10,13 +10,10 @@ const REQUEST_TIMEOUT_MS = 10_000;
 
 const firstName = (name: string) => name.split(" ")[0];
 
-/**
- * Called inside the mutation that changed the loan. The ledger row and the scheduled
- * job commit in the same transaction as the status change, so a status change can
- * neither lose its notification nor send one for a change that rolled back.
- */
+// Runs inside the mutation that changed the loan, so the status change, ledger row
+// and scheduled send commit together.
 export async function enqueueNotification(ctx: MutationCtx, loan: Omit<Doc<"loans">, "_creationTime">, tool: Doc<"tools">) {
-  // Requests and cancellations are news to the lender; everything else to the borrower.
+  // Requests and cancellations go to the lender, the rest to the borrower.
   const toOwner = loan.status === "pending" || loan.status === "cancelled";
   const recipient = await ctx.db.get(toOwner ? loan.ownerId : loan.borrowerId);
   if (!recipient) throw new Error(`Loan ${loan._id} has no recipient`);
@@ -28,8 +25,7 @@ export async function enqueueNotification(ctx: MutationCtx, loan: Omit<Doc<"loan
     status: "queued",
     loanId: loan._id,
   });
-  // Data minimization: exactly what the message needs, built field by field so a new
-  // column on users or tools can never leak into the webhook by accident.
+  // Only the fields the message needs, listed explicitly.
   const payload = {
     eventId,
     loanId: loan._id as string,
@@ -43,7 +39,7 @@ export async function enqueueNotification(ctx: MutationCtx, loan: Omit<Doc<"loan
   await ctx.scheduler.runAfter(0, internal.notifications.deliver, { payload, attempt: 1 });
 }
 
-/** Sends one signed webhook. Runs outside the mutation, so n8n can never slow or fail a user action. */
+// Sends one signed webhook, outside the user's mutation.
 export const deliver = internalAction({
   args: {
     attempt: v.number(),
@@ -66,7 +62,7 @@ export const deliver = internalAction({
       const secret = process.env.CONVEX_TO_N8N_SECRET;
       if (!url || !secret) throw new Error("N8N_REQUEST_WEBHOOK_URL or CONVEX_TO_N8N_SECRET is not set");
 
-      // Signed fresh on each attempt: a late retry must not carry a stale timestamp.
+      // Re-signed on every attempt so the timestamp stays fresh.
       const body = JSON.stringify(payload);
       const timestamp = String(Math.floor(Date.now() / 1000));
       const response = await fetch(url, {
@@ -81,15 +77,14 @@ export const deliver = internalAction({
       });
       if (response.ok) return;
       failure = `n8n responded ${response.status}`;
-      // A 4xx such as 401 (secret mismatch) fails the same way every time, so retrying
-      // only adds noise. Timeouts and rate limits are the exceptions. n8n uses the same rule.
+      // Retrying a 4xx won't help, except 408 and 429.
       permanent = response.status >= 400 && response.status < 500 && ![408, 429].includes(response.status);
     } catch (error) {
       failure = error instanceof Error ? error.message : String(error);
     }
 
     if (!permanent && attempt < MAX_ATTEMPTS) {
-      // Exponential backoff with jitter: about 5s, 15s, 45s, 2m15s.
+      // Backoff with jitter: ~5s, 15s, 45s, 2m15s.
       const delayMs = 5_000 * 3 ** (attempt - 1) * (0.8 + Math.random() * 0.4);
       console.warn(`[notify] ${payload.eventId} attempt ${attempt} failed: ${failure}`);
       await ctx.scheduler.runAfter(delayMs, internal.notifications.deliver, { payload, attempt: attempt + 1 });

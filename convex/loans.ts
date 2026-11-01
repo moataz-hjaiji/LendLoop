@@ -8,8 +8,7 @@ import { enqueueNotification } from "./notifications";
 
 const MAX_LIST = 100;
 
-// Transitions only move forward. That keeps "notify:<loanId>:<status>" unique, which
-// is what makes it usable as an idempotency key.
+// Forward-only transitions keep "notify:<loanId>:<status>" unique.
 const ALLOWED_TRANSITIONS: Record<LoanStatus, LoanStatus[]> = {
   pending: ["approved", "declined", "cancelled"],
   approved: ["returned"],
@@ -104,8 +103,7 @@ export const approve = mutation({
     if (target.loan.endDate < todayUtc()) {
       throw new ConvexError("The dates of this request have passed. Decline it instead.");
     }
-    // Convex mutations are serializable: two simultaneous approvals both read this
-    // index, so one is retried, sees the other's loan and fails here. No double booking.
+    // Serializable mutations: a concurrent approval is retried and fails here.
     if (await findOverlappingApprovedLoan(ctx, target.loan.toolId, target.loan)) {
       throw new ConvexError("Those dates overlap a loan you already approved.");
     }
@@ -134,7 +132,7 @@ export const markReturned = mutation({
   },
 });
 
-/** Adds display fields. Email is shared only with the other party, and only once approved. */
+// Email is shown to the other party only once the loan is approved.
 async function withDetails(ctx: QueryCtx, loan: Doc<"loans">) {
   const [tool, owner, borrower, events] = await Promise.all([
     ctx.db.get(loan.toolId),
@@ -160,7 +158,7 @@ async function withDetails(ctx: QueryCtx, loan: Doc<"loans">) {
       kind,
       status,
       updatedAt,
-      // Keys look like notify:<loanId>:<loan status>, which says what the message was about.
+      // Key format: notify:<loanId>:<status>
       about: kind === "notification" ? idempotencyKey.split(":")[2] : undefined,
     })),
   };

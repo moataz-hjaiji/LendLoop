@@ -47,7 +47,7 @@ function activeTools(ctx: QueryCtx, category?: Doc<"tools">["category"]) {
     .take(MAX_LIST);
 }
 
-/** The only unauthenticated query. Returns an explicit allow-list of fields: no owner data. */
+// Public query: name and category only.
 export const listPublic = query({
   args: {},
   handler: async (ctx) => {
@@ -130,8 +130,7 @@ export const remove = mutation({
     if (!tool || tool.removedAt !== undefined) throw new ConvexError("Tool not found.");
     authorize(canRemoveTool(viewer, tool));
 
-    // Owners must settle live loans first. Admins can still remove an abusive listing;
-    // its approved loans stay visible and can still be marked returned.
+    // Owners must settle approved loans first; admins can remove anyway.
     const approved = await loansWithStatus(ctx, toolId, "approved");
     if (approved.length > 0 && viewer.role !== "admin") {
       throw new ConvexError("This tool has approved loans. Settle them before removing it.");

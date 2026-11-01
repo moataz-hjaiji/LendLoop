@@ -10,10 +10,7 @@ const MAX_BODY_BYTES = 64 * 1024;
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
-/**
- * Every n8n -> Convex route goes through here, so a route cannot forget to verify.
- * The signature is checked over the raw bytes, before the body is parsed.
- */
+// Wraps every n8n route: verifies the raw bytes before parsing.
 function signedRoute(handler: (ctx: ActionCtx, rawBody: string) => Promise<Response>) {
   return httpAction(async (ctx, request) => {
     const bytes = new Uint8Array(await request.arrayBuffer());
@@ -28,7 +25,7 @@ function signedRoute(handler: (ctx: ActionCtx, rawBody: string) => Promise<Respo
       scope: `${request.method} ${path}`,
     });
     if (!result.ok) {
-      // The reason goes to our logs only, so callers learn nothing about why they failed.
+      // Reason is logged, not returned.
       console.warn(`[http] rejected ${path}: ${result.reason}`);
       return json({ error: "unauthorized" }, 401);
     }
@@ -52,7 +49,6 @@ http.route({
   handler: signedRoute(async (ctx, rawBody) => {
     try {
       const { idempotencyKey, kind, status, loanId, detail } = JSON.parse(rawBody);
-      // recordActivity's validators reject anything of the wrong type or value.
       return json(
         await ctx.runMutation(internal.automation.recordActivity, {
           idempotencyKey,

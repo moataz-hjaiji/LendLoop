@@ -2,10 +2,7 @@ import { ConvexError } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 
-/**
- * Every public function starts here. Identity comes only from the verified Clerk
- * JWT on ctx.auth; no function accepts a userId argument from the client.
- */
+// Identity comes only from the verified JWT; no function takes a userId from the client.
 export async function getCurrentUser(ctx: QueryCtx): Promise<Doc<"users"> | null> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) return null;
@@ -27,7 +24,7 @@ export async function requireAdmin(ctx: QueryCtx): Promise<Doc<"users">> {
   return user;
 }
 
-// Pure policy rules: no database access, so they can be unit tested exhaustively.
+// Pure rules, unit tested.
 type Actor = Pick<Doc<"users">, "_id" | "role">;
 type OwnedTool = Pick<Doc<"tools">, "ownerId">;
 type LoanParties = Pick<Doc<"loans">, "ownerId" | "borrowerId">;
@@ -37,8 +34,7 @@ export const canEditTool = (actor: Actor, tool: OwnedTool) => tool.ownerId === a
 export const canRemoveTool = (actor: Actor, tool: OwnedTool) =>
   tool.ownerId === actor._id || actor.role === "admin";
 
-// Admins moderate; they do not act on other people's loans. Only the lender decides
-// and confirms a return, because they are the one who gets the tool back.
+// Admins moderate but don't act on other people's loans; only the lender marks a return.
 export const canDecideLoan = (actor: Actor, loan: LoanParties) => loan.ownerId === actor._id;
 
 export const canCancelLoan = (actor: Actor, loan: LoanParties) => loan.borrowerId === actor._id;

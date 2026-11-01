@@ -35,6 +35,5 @@ const send = async () => {
   console.log(`${mode}: HTTP ${response.status} ${await response.text()}`);
 };
 await send();
-// A replay inside the time window passes the signature check. The claim stops it, so
-// the Mock Send step must run exactly once across both requests.
+// Same request twice: the claim must let only one send through.
 if (mode === "replay") await send();
