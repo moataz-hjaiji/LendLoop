@@ -84,7 +84,7 @@ Unit and integration tests, and the check to run before committing:
 
 ```bash
 npm test                  # RBAC, HMAC, dates, idempotency, HTTP endpoints
-npm run check:secrets     # no .env value in any tracked file; exports hold credential references only
+npm run check:secrets     # no secret value in any tracked file; exports hold credential references only
 ```
 
 n8n does not fire the Error Workflow for runs started with the editor's Execute button. `npm run n8n:overdue` runs through the CLI, which does.
@@ -255,7 +255,8 @@ See [PRODUCTION.md](PRODUCTION.md) for what else would change.
 Edit in the n8n UI, then export and check for secrets:
 
 ```bash
-docker compose exec -T n8n n8n export:workflow --id=<id> --pretty > n8n/workflows/<name>.json
+docker compose exec -T n8n n8n export:workflow --id=<id> --pretty --output=/tmp/workflow.json
+docker compose cp n8n:/tmp/workflow.json n8n/workflows/<name>.json
 npm run check:secrets
 ```
 
@@ -263,6 +264,7 @@ npm run check:secrets
 
 - Notifications are mocks: a log line and an execution record. An address ending in `@bounce.test` simulates a failed delivery.
 - "Today" is UTC, so overdue status flips at UTC midnight rather than local midnight.
+- Availability badges update when data changes, not when the date does, so an "Overdue" badge can appear late until the next write or page load. The reminder workflow is not affected, because it passes the date in.
 - Lists are capped (100 to 200 rows) with no pagination, which is enough for one neighborhood.
 - Approving a request does not auto-decline other pending requests for those dates. Approving one of them later is refused instead.
 - Seeded users have no Clerk login. Sign in as yourself and use the admin views to see their data.
