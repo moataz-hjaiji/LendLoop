@@ -10,7 +10,6 @@ export function setup() {
 }
 export type TestDb = ReturnType<typeof setup>;
 
-/** Creates a user through the real sign-in path, and returns a client acting as them. */
 export async function signIn(t: TestDb, name: string, role: "user" | "admin" = "user") {
   const client = t.withIdentity({ name, email: `${name.split(" ")[0]}@example.com`, subject: name, issuer: "test" });
   const userId = await client.mutation(api.users.store, {});

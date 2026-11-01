@@ -3,7 +3,7 @@ import { ConvexError } from "convex/values";
 export const MAX_LOAN_DAYS = 90;
 const DAY_MS = 86_400_000;
 
-// shortcut: "today" is UTC, so users far from UTC see overdue flip at UTC midnight; store a neighborhood timezone to fix.
+// UTC, so overdue flips at UTC midnight. A per-neighborhood timezone would fix that.
 export const todayUtc = (now = Date.now()) => new Date(now).toISOString().slice(0, 10);
 
 export function isValidDate(value: string): boolean {

@@ -14,7 +14,6 @@ type Props = {
   action: () => Promise<unknown>;
 };
 
-/** A destructive action, behind an explicit confirmation. */
 export function ConfirmButton({ label, title, description, confirmLabel, success, action }: Props) {
   const [open, setOpen] = useState(false);
   return (

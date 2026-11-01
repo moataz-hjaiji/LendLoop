@@ -11,7 +11,6 @@ type EventInput = Pick<Doc<"automationEvents">, "idempotencyKey" | "kind" | "sta
   detail?: string;
 };
 
-/** Upserts by idempotency key. Safe to call any number of times with the same input. */
 export async function recordEvent(ctx: MutationCtx, input: EventInput) {
   const existing = await ctx.db
     .query("automationEvents")
@@ -29,7 +28,6 @@ export async function recordEvent(ctx: MutationCtx, input: EventInput) {
   return { applied: true, status: input.status };
 }
 
-/** Called by the signed n8n write-back endpoint and by the outbound retry give-up path. */
 export const recordActivity = internalMutation({
   args: {
     idempotencyKey: v.string(),
@@ -52,7 +50,6 @@ export const recordActivity = internalMutation({
   },
 });
 
-/** Overdue loans not yet handled today, with only the fields a reminder needs. */
 export const overdueLoans = internalQuery({
   args: {},
   handler: async (ctx) => {
@@ -60,7 +57,7 @@ export const overdueLoans = internalQuery({
     const overdue = await ctx.db
       .query("loans")
       .withIndex("by_status_endDate", (q) => q.eq("status", "approved").lt("endDate", today))
-      .take(200); // shortcut: 200 per run, the rest get picked up as these are handled; paginate for scale
+      .take(200); // Oldest 200 only. Paginate if a run could ever exceed that.
 
     const rows = await Promise.all(
       overdue.map(async (loan) => {
@@ -87,7 +84,6 @@ export const overdueLoans = internalQuery({
   },
 });
 
-/** Admin view of recent automation, so failures are visible in the app, not just in n8n. */
 export const recent = query({
   args: {},
   handler: async (ctx) => {

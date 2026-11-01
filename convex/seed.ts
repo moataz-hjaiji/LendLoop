@@ -54,8 +54,8 @@ export const run = internalMutation({
         endDate: daysFromToday(-daysLate),
         status: "approved",
       });
-    await overdue("Cordless drill", ids.bob, 3); // the reminder succeeds
-    await overdue("Circular saw", ids.dana, 1); // the reminder fails, showing the error path
+    await overdue("Cordless drill", ids.bob, 3);
+    await overdue("Circular saw", ids.dana, 1);
 
     return "Seeded 3 users, 6 tools and 2 overdue loans.";
   },

@@ -6,7 +6,7 @@ import { todayUtc } from "./lib/dates";
 import { categoryValidator, conditionValidator } from "./lib/domain";
 import { enqueueNotification } from "./notifications";
 
-const MAX_LIST = 200; // shortcut: first 200 only, paginate past a neighborhood
+const MAX_LIST = 200;
 
 const toolFields = {
   name: v.string(),
@@ -23,7 +23,6 @@ function cleanToolInput(input: { name: string; description: string }) {
   return { name, description };
 }
 
-/** Availability today, plus booked ranges so the request form can warn before submitting. */
 async function getAvailability(ctx: QueryCtx, toolId: Id<"tools">) {
   const today = todayUtc();
   const approved = await ctx.db

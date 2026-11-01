@@ -32,7 +32,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (isAuthenticated) storeUser({}).catch((error) => setStoreError(errorMessage(error)));
   }, [isAuthenticated, storeUser]);
 
-  // The role here only decides whether to show a link. Convex enforces it on every call.
   const links = me?.role === "admin" ? [...LINKS, { href: "/admin", label: "Admin" }] : LINKS;
 
   let content = children;

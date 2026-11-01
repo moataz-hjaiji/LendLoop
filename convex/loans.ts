@@ -6,7 +6,7 @@ import { assertValidRange, rangesOverlap, todayUtc } from "./lib/dates";
 import type { LoanStatus } from "./lib/domain";
 import { enqueueNotification } from "./notifications";
 
-const MAX_LIST = 100; // shortcut: newest 100 only, paginate past a neighborhood
+const MAX_LIST = 100;
 
 // Transitions only move forward. That keeps "notify:<loanId>:<status>" unique, which
 // is what makes it usable as an idempotency key.
@@ -66,7 +66,6 @@ export const request = mutation({
   },
 });
 
-/** Loads a loan and checks the caller and the status allow this transition. Writes nothing. */
 async function loadForTransition(
   ctx: MutationCtx,
   loanId: Id<"loans">,

@@ -28,8 +28,10 @@ cp .env.local.example .env.local
 **3. Start Convex** (terminal 1, keep it running)
 
 ```bash
-CONVEX_AGENT_MODE=anonymous npx convex dev
+npx convex dev
 ```
+
+Choose **Start without an account (run Convex locally)**.
 
 The first push fails with `CLERK_JWT_ISSUER_DOMAIN ... was not set`. That is expected, and the next step fixes it.
 

@@ -1,6 +1,5 @@
 import { v } from "convex/values";
 
-// Shared by the schema, the functions and the UI, so there is one list of each.
 export const CATEGORIES = [
   "power tools",
   "hand tools",

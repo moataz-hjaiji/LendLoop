@@ -33,7 +33,6 @@ export function BorrowDialog({ tool, onClose }: Props) {
       toast.success("Request sent to the lender");
       onClose();
     } catch (caught) {
-      // The server owns the date rules, so its message is what we show.
       setError(errorMessage(caught));
     } finally {
       setPending(false);

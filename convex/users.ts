@@ -2,7 +2,6 @@ import { ConvexError, v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { getCurrentUser, requireAdmin } from "./lib/auth";
 
-/** Creates or refreshes the signed-in user's row. The client sends nothing but its JWT. */
 export const store = mutation({
   args: {},
   handler: async (ctx) => {
@@ -34,7 +33,6 @@ export const me = query({
   handler: async (ctx) => {
     const user = await getCurrentUser(ctx);
     if (!user) return null;
-    // For the UI only (which nav links to show). The server still checks every call.
     return { _id: user._id, name: user.name, role: user.role, trustedLender: user.trustedLender };
   },
 });
@@ -43,7 +41,7 @@ export const listAll = query({
   args: {},
   handler: async (ctx) => {
     await requireAdmin(ctx);
-    const users = await ctx.db.query("users").take(200); // shortcut: first 200 only, paginate past a neighborhood
+    const users = await ctx.db.query("users").take(200);
     return users.map(({ _id, name, email, role, trustedLender }) => ({
       _id,
       name,

@@ -11,7 +11,6 @@ type Props = Omit<ComponentProps<typeof Button>, "onClick"> & {
   onDone?: () => void;
 };
 
-/** A button for one mutation: disabled while it runs, and reports the outcome in a toast. */
 export function ActionButton({ action, success, onDone, disabled, ...props }: Props) {
   const [pending, setPending] = useState(false);
   return (

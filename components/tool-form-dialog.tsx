@@ -17,7 +17,7 @@ import { errorMessage } from "@/lib/errors";
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  tool?: Doc<"tools">; // present when editing
+  tool?: Doc<"tools">;
 };
 
 export function ToolFormDialog({ open, onOpenChange, tool }: Props) {

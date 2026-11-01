@@ -126,7 +126,6 @@ function AllLoans() {
 
 export default function AdminPage() {
   const me = useQuery(api.users.me);
-  // Direct visits by non-admins get a message; Convex would refuse their queries anyway.
   if (me && me.role !== "admin") return <p className="text-muted-foreground">This page is for admins.</p>;
 
   return (
