@@ -131,7 +131,7 @@
       "parameters": {
         "mode": "runOnceForEachItem",
         "language": "javaScript",
-        "jsCode": "// n8n's built-in Retry On Fail waits a fixed interval, so backoff is done here: 2s, 4s, 8s.\nconst MAX_ATTEMPTS = 4;\nconst request = $('Prepare').last().json;\nconst message = $json.error?.message ?? JSON.stringify($json.error ?? $json);\nif (request.attempt >= MAX_ATTEMPTS) {\n  throw new Error(`${request.method} ${request.path} failed after ${request.attempt} attempts: ${message}`);\n}\nconsole.warn(`[signed-request] ${request.path} attempt ${request.attempt} failed: ${message}`);\nreturn {\n  method: request.method,\n  path: request.path,\n  body: request.body,\n  context: request.context,\n  attempt: request.attempt,\n  waitSeconds: 2 ** request.attempt,\n};"
+        "jsCode": "// n8n's built-in Retry On Fail waits a fixed interval, so backoff is done here: 2s, 4s, 8s.\nconst MAX_ATTEMPTS = 4;\nconst request = $('Prepare').last().json;\nconst message = $json.error?.message ?? JSON.stringify($json.error ?? $json);\nif (request.attempt >= MAX_ATTEMPTS) {\n  throw new Error(`${request.method} ${request.path} failed after ${request.attempt} attempts: ${message}`);\n}\nconsole.log(`[signed-request] ${request.path} attempt ${request.attempt} failed: ${message}`);\nreturn {\n  method: request.method,\n  path: request.path,\n  body: request.body,\n  context: request.context,\n  attempt: request.attempt,\n  waitSeconds: 2 ** request.attempt,\n};"
       }
     },
     {
