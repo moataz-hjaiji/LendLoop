@@ -3,7 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery, query, type MutationCtx } from "./_generated/server";
 import { requireAdmin } from "./lib/auth";
 import { shouldApply } from "./lib/automationState";
-import { daysBetween, todayUtc } from "./lib/dates";
+import { daysBetween } from "./lib/dates";
 import { eventKindValidator, eventStatusValidator } from "./lib/domain";
 
 type EventInput = Pick<Doc<"automationEvents">, "idempotencyKey" | "kind" | "status"> & {
@@ -50,10 +50,11 @@ export const recordActivity = internalMutation({
   },
 });
 
+// `today` is an argument because Convex caches query results and passing time does not
+// refresh them. With Date.now() here, the daily run could receive yesterday's list.
 export const overdueLoans = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    const today = todayUtc();
+  args: { today: v.string() },
+  handler: async (ctx, { today }) => {
     const overdue = await ctx.db
       .query("loans")
       .withIndex("by_status_endDate", (q) => q.eq("status", "approved").lt("endDate", today))

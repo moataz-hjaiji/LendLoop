@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { SIGNATURE_HEADER, signPayload, TIMESTAMP_HEADER } from "./lib/hmac";
 import { futureRange, newTool, setup, signIn, type TestDb } from "./test.utils";
@@ -121,6 +121,12 @@ describe("overdue feed", () => {
     expect(await fetchOverdue()).toEqual([]);
   });
 
+  test("the date comes from the caller, so Convex cannot serve yesterday's cached list", async () => {
+    const { loanId } = await overdueLoan();
+    const [loan] = await t.query(internal.automation.overdueLoans, { today: "2099-01-01" });
+    expect(loan.idempotencyKey).toBe(`reminder:${loanId}:2099-01-01`);
+  });
+
   test("a returned loan is no longer overdue", async () => {
     const { loanId, alice } = await overdueLoan();
     await alice.client.mutation(api.loans.markReturned, { loanId });
@@ -177,6 +183,39 @@ describe("outbound notifications", () => {
     const headers = init.headers as Record<string, string>;
     expect(headers[SIGNATURE_HEADER]).toBe(await signPayload("out-secret", headers[TIMESTAMP_HEADER], init.body as string));
     expect(await events()).toMatchObject([{ kind: "notification", status: "queued" }]);
+    vi.unstubAllGlobals();
+  });
+
+  test("each status change notifies the right person", async () => {
+    const fetchMock = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(async () => new Response("{}", { status: 202 }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubEnv("N8N_REQUEST_WEBHOOK_URL", "http://n8n.test/hook");
+    vi.stubEnv("CONVEX_TO_N8N_SECRET", "out-secret");
+
+    const alice = await signIn(t, "alice");
+    const bob = await signIn(t, "bob");
+    const toolId = await alice.client.mutation(api.tools.create, newTool);
+
+    const first = await bob.client.mutation(api.loans.request, { toolId, ...futureRange(1, 2) });
+    await bob.client.mutation(api.loans.cancel, { loanId: first });
+    const second = await bob.client.mutation(api.loans.request, { toolId, ...futureRange(3, 4) });
+    await alice.client.mutation(api.loans.decline, { loanId: second });
+    const third = await bob.client.mutation(api.loans.request, { toolId, ...futureRange(5, 6) });
+    await alice.client.mutation(api.loans.approve, { loanId: third });
+    await alice.client.mutation(api.loans.markReturned, { loanId: third });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    const sent = fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body as string));
+    const recipients = Object.fromEntries(sent.map((event) => [`${event.loanId}:${event.status}`, event.recipientEmail]));
+    expect(recipients).toEqual({
+      [`${first}:pending`]: "alice@example.com",
+      [`${first}:cancelled`]: "alice@example.com",
+      [`${second}:pending`]: "alice@example.com",
+      [`${second}:declined`]: "bob@example.com",
+      [`${third}:pending`]: "alice@example.com",
+      [`${third}:approved`]: "bob@example.com",
+      [`${third}:returned`]: "bob@example.com",
+    });
     vi.unstubAllGlobals();
   });
 

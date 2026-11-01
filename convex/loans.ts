@@ -27,7 +27,11 @@ async function findOverlappingApprovedLoan(
     .query("loans")
     .withIndex("by_tool_status", (q) => q.eq("toolId", toolId).eq("status", "approved"))
     .collect();
-  return approved.find((loan) => rangesOverlap(loan, range));
+  const today = todayUtc();
+  // A loan past its end date still holds the tool until the lender confirms the return.
+  return approved.find((loan) =>
+    rangesOverlap({ startDate: loan.startDate, endDate: loan.endDate < today ? today : loan.endDate }, range),
+  );
 }
 
 export const request = mutation({
@@ -97,6 +101,9 @@ export const approve = mutation({
   args: { loanId: v.id("loans") },
   handler: async (ctx, { loanId }) => {
     const target = await loadForTransition(ctx, loanId, "approved", canDecideLoan);
+    if (target.loan.endDate < todayUtc()) {
+      throw new ConvexError("The dates of this request have passed. Decline it instead.");
+    }
     // Convex mutations are serializable: two simultaneous approvals both read this
     // index, so one is retried, sees the other's loan and fails here. No double booking.
     if (await findOverlappingApprovedLoan(ctx, target.loan.toolId, target.loan)) {

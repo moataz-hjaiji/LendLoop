@@ -151,6 +151,36 @@ describe("overlap rules", () => {
     await alice.client.mutation(api.loans.approve, { loanId: second }); // returned frees the dates
   });
 
+  test("a request whose dates have passed cannot be approved", async () => {
+    const alice = await signIn(t, "alice");
+    const bob = await signIn(t, "bob");
+    const toolId = await alice.client.mutation(api.tools.create, newTool);
+    const { startDate, endDate } = futureRange(-5, -3);
+    const loanId = await t.run((ctx) =>
+      ctx.db.insert("loans", { toolId, ownerId: alice.userId, borrowerId: bob.userId, startDate, endDate, status: "pending" }),
+    );
+    await expect(alice.client.mutation(api.loans.approve, { loanId })).rejects.toThrow("passed");
+    await alice.client.mutation(api.loans.decline, { loanId }); // it can still be cleared away
+  });
+
+  test("a tool that is overdue and not returned cannot be booked for today", async () => {
+    const alice = await signIn(t, "alice");
+    const bob = await signIn(t, "bob");
+    const carol = await signIn(t, "carol");
+    const toolId = await alice.client.mutation(api.tools.create, newTool);
+    const { startDate, endDate } = futureRange(-5, -1);
+    const overdue = await t.run((ctx) =>
+      ctx.db.insert("loans", { toolId, ownerId: alice.userId, borrowerId: bob.userId, startDate, endDate, status: "approved" }),
+    );
+
+    await expect(carol.client.mutation(api.loans.request, { toolId, ...futureRange(0, 1) })).rejects.toThrow("booked");
+    const later = await carol.client.mutation(api.loans.request, { toolId, ...futureRange(1, 2) });
+    await alice.client.mutation(api.loans.approve, { loanId: later });
+
+    await alice.client.mutation(api.loans.markReturned, { loanId: overdue });
+    await carol.client.mutation(api.loans.request, { toolId, ...futureRange(0, 0) }); // returned frees today
+  });
+
   test("bad dates are rejected by the server", async () => {
     const alice = await signIn(t, "alice");
     const bob = await signIn(t, "bob");

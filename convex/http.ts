@@ -2,6 +2,7 @@ import { httpRouter } from "convex/server";
 import { ConvexError } from "convex/values";
 import { internal } from "./_generated/api";
 import { httpAction, type ActionCtx } from "./_generated/server";
+import { todayUtc } from "./lib/dates";
 import { SIGNATURE_HEADER, TIMESTAMP_HEADER, verifyPayload } from "./lib/hmac";
 
 const MAX_BODY_BYTES = 64 * 1024;
@@ -39,7 +40,7 @@ http.route({
   path: "/n8n/overdue-loans",
   method: "GET",
   handler: signedRoute(async (ctx) => {
-    return json({ loans: await ctx.runQuery(internal.automation.overdueLoans, {}) });
+    return json({ loans: await ctx.runQuery(internal.automation.overdueLoans, { today: todayUtc() }) });
   }),
 });
 
