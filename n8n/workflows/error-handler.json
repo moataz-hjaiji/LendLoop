@@ -1,0 +1,100 @@
+{
+  "id": "lendloopErrorWf1",
+  "name": "LendLoop - Error Handler",
+  "active": false,
+  "nodes": [
+    {
+      "id": "note",
+      "name": "Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        200,
+        -140
+      ],
+      "parameters": {
+        "content": "## Error Handler\nSet as the Error Workflow of the other workflows. Logs each failed run to stdout, and records it in Convex so it shows on the app's Admin page.\n\nIf this fails too, its own failed execution and the log line remain.",
+        "width": 500,
+        "height": 150
+      }
+    },
+    {
+      "id": "on-workflow-error",
+      "name": "On Workflow Error",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        200
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "log-failure",
+      "name": "Log Failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "// Two records, on purpose. The log line survives even if Convex is what is down;\n// the write-back is what makes the failure visible to admins in the app.\nconst { execution, workflow } = $json;\nconst node = execution?.lastNodeExecuted ?? 'unknown node';\n// For a failed sub-workflow, the real cause is in description; message is generic.\nconst message = execution?.error?.description ?? execution?.error?.message ?? 'unknown error';\nconst id = execution?.id ?? String(Date.now());\nconsole.error(JSON.stringify({ channel: 'lendloop-workflow-failure', workflow: workflow?.name, executionId: id, node, message }));\nreturn {\n  method: 'POST',\n  path: '/n8n/activity',\n  body: JSON.stringify({\n    idempotencyKey: `error:${id}`,\n    kind: 'workflow_error',\n    status: 'failed',\n    detail: `${workflow?.name} (execution ${id}) failed at \"${node}\": ${message}`.slice(0, 480),\n  }),\n};"
+      }
+    },
+    {
+      "id": "record-in-convex",
+      "name": "Record In Convex",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        680,
+        200
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "lendloopSignedReq",
+          "mode": "id"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    }
+  ],
+  "connections": {
+    "On Workflow Error": {
+      "main": [
+        [
+          {
+            "node": "Log Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Failure": {
+      "main": [
+        [
+          {
+            "node": "Record In Convex",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "pinData": {},
+  "tags": []
+}

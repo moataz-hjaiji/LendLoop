@@ -1,0 +1,234 @@
+{
+  "id": "lendloopSignedReq",
+  "name": "LendLoop - Signed Request (sub-workflow)",
+  "active": false,
+  "nodes": [
+    {
+      "id": "note",
+      "name": "Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        200,
+        -160
+      ],
+      "parameters": {
+        "content": "## Signed Request\nEvery n8n to Convex call goes through here, so no workflow can forget to sign.\n\nThe HMAC secret is held in an n8n **credential** (Crypto node). It is never in this JSON or read from the environment.\n\nRetries back off exponentially and re-sign each attempt.",
+        "width": 520,
+        "height": 170
+      }
+    },
+    {
+      "id": "when-called",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        200
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "prepare",
+      "name": "Prepare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "// The one place that knows Convex's address. Not a secret, so it lives here rather\n// than read from the environment: env access stays blocked for every n8n expression.\nconst CONVEX_SITE_URL = 'http://host.docker.internal:3211';\n\n// Called again on each retry, so every attempt gets a fresh timestamp and signature.\nconst body = $json.body ?? '';\nconst timestamp = String(Math.floor(Date.now() / 1000));\nreturn {\n  method: $json.method,\n  url: CONVEX_SITE_URL + $json.path,\n  path: $json.path,\n  body,\n  context: $json.context ?? null,\n  attempt: ($json.attempt ?? 0) + 1,\n  timestamp,\n  // Must match convex/lib/hmac.ts: \"<unix seconds>.<raw body>\"\n  signingInput: `${timestamp}.${body}`,\n};"
+      }
+    },
+    {
+      "id": "sign",
+      "name": "Sign",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        680,
+        200
+      ],
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.signingInput }}",
+        "dataPropertyName": "signature",
+        "encoding": "hex"
+      },
+      "credentials": {
+        "crypto": {
+          "id": "lendloopHmacOut",
+          "name": "LendLoop HMAC n8n to Convex"
+        }
+      }
+    },
+    {
+      "id": "call-convex",
+      "name": "Call Convex",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        200
+      ],
+      "parameters": {
+        "method": "={{ $json.method }}",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-lendloop-timestamp",
+              "value": "={{ $json.timestamp }}"
+            },
+            {
+              "name": "x-lendloop-signature",
+              "value": "={{ $json.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "result",
+      "name": "Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "return { response: $json, context: $('Prepare').last().json.context };"
+      }
+    },
+    {
+      "id": "backoff-or-fail",
+      "name": "Backoff Or Fail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        340
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "// n8n's built-in Retry On Fail waits a fixed interval, so backoff is done here: 2s, 4s, 8s.\nconst MAX_ATTEMPTS = 4;\nconst request = $('Prepare').last().json;\nconst message = $json.error?.message ?? JSON.stringify($json.error ?? $json);\nif (request.attempt >= MAX_ATTEMPTS) {\n  throw new Error(`${request.method} ${request.path} failed after ${request.attempt} attempts: ${message}`);\n}\nconsole.warn(`[signed-request] ${request.path} attempt ${request.attempt} failed: ${message}`);\nreturn {\n  method: request.method,\n  path: request.path,\n  body: request.body,\n  context: request.context,\n  attempt: request.attempt,\n  waitSeconds: 2 ** request.attempt,\n};"
+      }
+    },
+    {
+      "id": "wait",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1340,
+        340
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": "={{ $json.waitSeconds }}",
+        "unit": "seconds"
+      }
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare": {
+      "main": [
+        [
+          {
+            "node": "Sign",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign": {
+      "main": [
+        [
+          {
+            "node": "Call Convex",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Convex": {
+      "main": [
+        [
+          {
+            "node": "Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Backoff Or Fail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backoff Or Fail": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "pinData": {},
+  "tags": []
+}

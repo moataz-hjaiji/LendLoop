@@ -1,0 +1,30 @@
+# n8n for local development. Secrets come from .env (npm run env:init), never from this file.
+services:
+  n8n:
+    image: n8nio/n8n:2.45.7 # pinned: workflows are tested against this version
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5678:5678" # localhost only
+    environment:
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?run npm run env:init}
+      WEBHOOK_URL: http://localhost:5678/
+      GENERIC_TIMEZONE: UTC
+      # Secrets live in n8n credentials, so workflows need no env access. Blocking it
+      # stops any expression reading N8N_ENCRYPTION_KEY.
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "true"
+      # Code nodes may use only this built-in, for timingSafeEqual.
+      NODE_FUNCTION_ALLOW_BUILTIN: crypto
+      # Makes console.log in Code nodes visible in `docker compose logs`.
+      CODE_ENABLE_STDOUT: "true"
+      # Executions contain borrower emails, so do not keep them forever.
+      EXECUTIONS_DATA_PRUNE: "true"
+      EXECUTIONS_DATA_MAX_AGE: "336" # hours (14 days)
+      N8N_DIAGNOSTICS_ENABLED: "false"
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # lets Linux reach local Convex too
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n/workflows:/workflows:ro
+
+volumes:
+  n8n_data:

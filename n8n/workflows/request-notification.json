@@ -1,0 +1,446 @@
+{
+  "id": "lendloopNotify01",
+  "name": "LendLoop - Request Notification",
+  "active": false,
+  "nodes": [
+    {
+      "id": "note",
+      "name": "Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        200,
+        -180
+      ],
+      "parameters": {
+        "content": "## Request Notification\nConvex POSTs a signed event here when a request is created or changes status.\n\n1. Verify the HMAC over the raw bytes, with a timestamp check and constant-time compare.\n2. Respond before doing the work, so Convex is not held open.\n3. Claim, send, write back. Each write-back is signed and idempotent.",
+        "width": 560,
+        "height": 190
+      }
+    },
+    {
+      "id": "request-events",
+      "name": "Request Events",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        200
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lendloop/request-events",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "webhookId": "lendloop-request-events"
+    },
+    {
+      "id": "read-raw-body",
+      "name": "Read Raw Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Verify over the exact bytes received. The webhook's Raw Body option keeps them; the\n// parsed JSON would not reproduce the signature if whitespace or key order differed.\nconst raw = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst rawBody = raw.toString('utf8');\nconst headers = $input.first().json.headers;\nconst timestamp = headers['x-lendloop-timestamp'] ?? '';\nreturn [{ json: {\n  rawBody,\n  timestamp,\n  receivedSignature: headers['x-lendloop-signature'] ?? '',\n  signingInput: `${timestamp}.${rawBody}`,\n} }];"
+      }
+    },
+    {
+      "id": "compute-expected-hmac",
+      "name": "Compute Expected HMAC",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        680,
+        200
+      ],
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.signingInput }}",
+        "dataPropertyName": "signature",
+        "encoding": "hex"
+      },
+      "credentials": {
+        "crypto": {
+          "id": "lendloopHmacIn",
+          "name": "LendLoop HMAC Convex to n8n"
+        }
+      }
+    },
+    {
+      "id": "verify-signature",
+      "name": "Verify Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "// The Crypto node computed the expected HMAC using the credential. This node only\n// compares digests, so it never has access to the secret.\nconst crypto = require('crypto');\nconst TOLERANCE_SECONDS = 300;\n\nconst { rawBody, timestamp, receivedSignature, signature: expected } = $json;\nconst fresh = /^\\d{1,12}$/.test(timestamp)\n  && Math.abs(Date.now() / 1000 - Number(timestamp)) <= TOLERANCE_SECONDS;\nconst received = Buffer.from(receivedSignature, 'utf8');\nconst wanted = Buffer.from(expected, 'utf8');\n// timingSafeEqual throws on different lengths; length is not a secret, so check it first.\nconst matches = received.length === wanted.length && crypto.timingSafeEqual(received, wanted);\n\nif (!fresh || !matches) {\n  console.warn(`[notify] rejected webhook: ${fresh ? 'bad signature' : 'stale or missing timestamp'}`);\n  return { valid: false };\n}\nreturn { valid: true, payload: JSON.parse(rawBody) };"
+      }
+    },
+    {
+      "id": "is-valid",
+      "name": "Is Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "respond-202",
+      "name": "Respond 202",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1340,
+        80
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"accepted\": true } }}",
+        "options": {
+          "responseCode": 202
+        }
+      }
+    },
+    {
+      "id": "build-claim",
+      "name": "Build Claim",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        80
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "// Claim before sending: if Convex retries this webhook, the duplicate run loses the claim.\nconst { payload } = $json;\nreturn {\n  method: 'POST',\n  path: '/n8n/activity',\n  body: JSON.stringify({ idempotencyKey: payload.eventId, kind: 'notification', status: 'sending', loanId: payload.loanId }),\n  context: payload,\n};"
+      }
+    },
+    {
+      "id": "claim",
+      "name": "Claim",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1780,
+        80
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "lendloopSignedReq",
+          "mode": "id"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "won-claim",
+      "name": "Won Claim",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2000,
+        80
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.response.applied }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "mock-send",
+      "name": "Mock Send",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2220,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "const mask = (email) => email.replace(/^(.).*(@.*)$/, '$1***$2');\n\n// Mock notification: writes to the container log and this execution's output. An address\n// ending in @bounce.test simulates a delivery failure, for demoing the failure path.\nconst event = $json.context;\nconst SUBJECTS = {\n  pending: `New request to borrow your ${event.toolName}`,\n  approved: `Your request for ${event.toolName} was approved`,\n  declined: `Your request for ${event.toolName} was declined`,\n  cancelled: `A request for your ${event.toolName} was cancelled`,\n  returned: `Your loan of ${event.toolName} is marked returned`,\n};\nconst delivered = !event.recipientEmail.endsWith('@bounce.test');\n// Addresses are masked so logs do not accumulate personal data.\nconsole.log(JSON.stringify({ channel: 'mock-notification', to: mask(event.recipientEmail), subject: SUBJECTS[event.status], delivered }));\nreturn {\n  method: 'POST',\n  path: '/n8n/activity',\n  body: JSON.stringify({\n    idempotencyKey: event.eventId,\n    kind: 'notification',\n    status: delivered ? 'sent' : 'failed',\n    loanId: event.loanId,\n    detail: delivered ? undefined : 'Mock delivery failed',\n  }),\n  context: { idempotencyKey: event.eventId, delivered },\n};"
+      }
+    },
+    {
+      "id": "write-back",
+      "name": "Write Back",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2440,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "lendloopSignedReq",
+          "mode": "id"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "fail-run-if-undelivered",
+      "name": "Fail Run If Undelivered",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2660,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Runs after every item has been written back, so one bad recipient does not stop the\n// others. Throwing here marks the run failed, which triggers the Error Workflow.\nconst failed = $input.all().filter((item) => item.json.context.delivered === false);\nif (failed.length > 0) {\n  throw new Error(`${failed.length} of ${$input.all().length} notification(s) failed: ${failed.map((item) => item.json.context.idempotencyKey).join(', ')}`);\n}\nreturn [{ json: { sent: $input.all().length } }];"
+      }
+    },
+    {
+      "id": "respond-401",
+      "name": "Respond 401",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1340,
+        340
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"unauthorized\" } }}",
+        "options": {
+          "responseCode": 401
+        }
+      }
+    },
+    {
+      "id": "rejected",
+      "name": "Rejected",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        1560,
+        340
+      ],
+      "parameters": {
+        "errorMessage": "Rejected a webhook with an invalid or stale signature"
+      }
+    }
+  ],
+  "connections": {
+    "Request Events": {
+      "main": [
+        [
+          {
+            "node": "Read Raw Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Raw Body": {
+      "main": [
+        [
+          {
+            "node": "Compute Expected HMAC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Expected HMAC": {
+      "main": [
+        [
+          {
+            "node": "Verify Signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Signature": {
+      "main": [
+        [
+          {
+            "node": "Is Valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid": {
+      "main": [
+        [
+          {
+            "node": "Respond 202",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 401",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 401": {
+      "main": [
+        [
+          {
+            "node": "Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 202": {
+      "main": [
+        [
+          {
+            "node": "Build Claim",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Claim": {
+      "main": [
+        [
+          {
+            "node": "Claim",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim": {
+      "main": [
+        [
+          {
+            "node": "Won Claim",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Won Claim": {
+      "main": [
+        [
+          {
+            "node": "Mock Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Send": {
+      "main": [
+        [
+          {
+            "node": "Write Back",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Back": {
+      "main": [
+        [
+          {
+            "node": "Fail Run If Undelivered",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "lendloopErrorWf1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "pinData": {},
+  "tags": []
+}
