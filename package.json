@@ -10,6 +10,7 @@
     "test": "vitest run",
     "env:init": "node scripts/init-env.mjs",
     "convex:env": "node scripts/sync-convex-env.mjs",
+    "docker:app": "docker compose --env-file .env --env-file .env.local --profile app up -d --build",
     "check:secrets": "node scripts/check-secrets.mjs",
     "n8n:import": "node scripts/n8n-import.mjs",
     "n8n:overdue": "docker compose exec -T -e N8N_RUNNERS_BROKER_PORT=5699 n8n n8n execute --id=lendloopOverdue1",

@@ -1,5 +1,19 @@
 # n8n for local development. Secrets come from .env (npm run env:init), never from this file.
+# The app container is opt-in: `npm run docker:app` starts it. See the README.
 services:
+  app:
+    profiles: [app]
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}
+        NEXT_PUBLIC_CONVEX_URL: ${NEXT_PUBLIC_CONVEX_URL:-}
+    ports:
+      - "127.0.0.1:3000:3000" # localhost only
+    environment:
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-} # runtime only, so it is never stored in the image
+    restart: unless-stopped
+
   n8n:
     image: n8nio/n8n:2.45.7 # pinned: workflows are tested against this version
     restart: unless-stopped

@@ -1,0 +1,10 @@
+# Keeps secrets and local state out of the build context, and so out of the image.
+.env*
+.convex
+.clerk
+.git
+.next
+node_modules
+n8n
+scripts
+*.md

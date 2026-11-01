@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 // Baseline headers that cannot break Clerk or Convex. A full CSP is in PRODUCTION.md.
 const nextConfig: NextConfig = {
+  output: "standalone", // lets the Docker image ship only what the server needs
   turbopack: {
     rules: {
       "*.css": {

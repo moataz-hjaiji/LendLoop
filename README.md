@@ -63,6 +63,20 @@ Sign in once, then promote yourself:
 npx convex run users:promoteToAdmin '{"email":"you@example.com"}'
 ```
 
+## Running the app in Docker
+
+After steps 1 to 5, you can run the app in a container instead of `npm run dev`:
+
+```bash
+npm run docker:app        # builds the image and serves http://localhost:3000
+```
+
+Stop it with `docker compose --profile app down`. That leaves the `n8n_data` volume alone, but it also stops n8n, so start n8n again with `docker compose up -d`.
+
+Only the Next.js app runs in this container. Convex stays on `npx convex dev`, because its CLI has to push the functions, and the browser reaches it at `NEXT_PUBLIC_CONVEX_URL`. The image is built for that one URL and Clerk key, so rebuild it if either changes.
+
+`CLERK_SECRET_KEY` is passed at runtime and is not stored in the image. `.dockerignore` keeps every `.env` file out of the build.
+
 ## Testing the workflows
 
 The **Admin > Automation** page updates live while you run these.
