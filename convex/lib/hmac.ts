@@ -3,6 +3,10 @@
  *
  *   signature = hex( HMAC-SHA256( secret, "<unix seconds>." + <raw body bytes> ) )
  *
+ * n8n -> Convex requests also sign their route, "<unix seconds>.<METHOD> <path>." + body,
+ * so a captured request cannot be replayed against a different endpoint. Convex -> n8n
+ * has a single webhook and keeps the shorter form; each direction has its own secret.
+ *
  * The timestamp is inside the signed bytes, so it cannot be changed to refresh an
  * old request. We sign bytes rather than parsed JSON because re-serializing can
  * reorder keys or change whitespace, which would change the signature.
@@ -29,8 +33,8 @@ function importKey(secret: string, usage: "sign" | "verify") {
   );
 }
 
-function signedBytes(timestamp: string, rawBody: string | Uint8Array) {
-  const prefix = encoder.encode(`${timestamp}.`);
+function signedBytes(timestamp: string, rawBody: string | Uint8Array, scope?: string) {
+  const prefix = encoder.encode(scope ? `${timestamp}.${scope}.` : `${timestamp}.`);
   const body = typeof rawBody === "string" ? encoder.encode(rawBody) : rawBody;
   const bytes = new Uint8Array(prefix.length + body.length);
   bytes.set(prefix);
@@ -42,11 +46,12 @@ export async function signPayload(
   secret: string,
   timestamp: string,
   rawBody: string | Uint8Array,
+  scope?: string,
 ): Promise<string> {
   const mac = await crypto.subtle.sign(
     "HMAC",
     await importKey(secret, "sign"),
-    signedBytes(timestamp, rawBody),
+    signedBytes(timestamp, rawBody, scope),
   );
   return Array.from(new Uint8Array(mac), (b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -56,9 +61,11 @@ export async function verifyPayload(args: {
   timestamp: string | null;
   signature: string | null;
   rawBody: string | Uint8Array;
+  /** "<METHOD> <path>" for routes that sign it. */
+  scope?: string;
   nowSeconds?: number;
 }): Promise<VerifyResult> {
-  const { secret, timestamp, signature, rawBody } = args;
+  const { secret, timestamp, signature, rawBody, scope } = args;
   if (!secret) return { ok: false, reason: "malformed" }; // never accept an empty key
   if (!timestamp || !/^\d{1,12}$/.test(timestamp)) return { ok: false, reason: "malformed" };
   if (!signature || !/^[0-9a-f]{64}$/.test(signature)) return { ok: false, reason: "malformed" };
@@ -72,7 +79,7 @@ export async function verifyPayload(args: {
     "HMAC",
     await importKey(secret, "verify"),
     expected,
-    signedBytes(timestamp, rawBody),
+    signedBytes(timestamp, rawBody, scope),
   );
   return valid ? { ok: true } : { ok: false, reason: "bad_signature" };
 }

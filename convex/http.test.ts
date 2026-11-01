@@ -22,7 +22,7 @@ async function signedPost(body: unknown, timestamp = seconds()) {
     method: "POST",
     headers: {
       [TIMESTAMP_HEADER]: timestamp,
-      [SIGNATURE_HEADER]: await signPayload(SECRET, timestamp, raw),
+      [SIGNATURE_HEADER]: await signPayload(SECRET, timestamp, raw, "POST /n8n/activity"),
     },
     body: raw,
   });
@@ -56,7 +56,7 @@ describe("signed endpoints reject bad requests", () => {
   test("wrong secret", async () => {
     const timestamp = seconds();
     const response = await t.fetch("/n8n/overdue-loans", {
-      headers: { [TIMESTAMP_HEADER]: timestamp, [SIGNATURE_HEADER]: await signPayload("wrong", timestamp, "") },
+      headers: { [TIMESTAMP_HEADER]: timestamp, [SIGNATURE_HEADER]: await signPayload("wrong", timestamp, "", "GET /n8n/overdue-loans") },
     });
     expect(response.status).toBe(401);
   });
@@ -74,9 +74,17 @@ describe("signed endpoints reject bad requests", () => {
       method: "POST",
       headers: {
         [TIMESTAMP_HEADER]: timestamp,
-        [SIGNATURE_HEADER]: await signPayload(SECRET, timestamp, '{"status":"failed"}'),
+        [SIGNATURE_HEADER]: await signPayload(SECRET, timestamp, '{"status":"failed"}', "POST /n8n/activity"),
       },
       body: '{"status":"sent"}',
+    });
+    expect(response.status).toBe(401);
+  });
+
+  test("a signature made for another route", async () => {
+    const timestamp = seconds();
+    const response = await t.fetch("/n8n/overdue-loans", {
+      headers: { [TIMESTAMP_HEADER]: timestamp, [SIGNATURE_HEADER]: await signPayload(SECRET, timestamp, "", "GET /n8n/other") },
     });
     expect(response.status).toBe(401);
   });
@@ -93,7 +101,7 @@ describe("overdue feed", () => {
   async function fetchOverdue() {
     const timestamp = seconds();
     const response = await t.fetch("/n8n/overdue-loans", {
-      headers: { [TIMESTAMP_HEADER]: timestamp, [SIGNATURE_HEADER]: await signPayload(SECRET, timestamp, "") },
+      headers: { [TIMESTAMP_HEADER]: timestamp, [SIGNATURE_HEADER]: await signPayload(SECRET, timestamp, "", "GET /n8n/overdue-loans") },
     });
     expect(response.status).toBe(200);
     return (await response.json()).loans;
@@ -156,6 +164,29 @@ describe("idempotent write-back", () => {
     expect(await events()).toHaveLength(1);
     const [row] = await bob.client.query(api.loans.myRequests, {});
     expect(row.activity).toMatchObject([{ kind: "reminder", status: "sent" }]);
+  });
+});
+
+describe("stuck events", () => {
+  test("rows left queued or sending past the limit become visible failures", async () => {
+    const { loanId } = await overdueLoan();
+    const insert = (idempotencyKey: string, status: "queued" | "sending" | "sent", ageMs: number) =>
+      t.run((ctx) =>
+        ctx.db.insert("automationEvents", { idempotencyKey, kind: "reminder", status, loanId, updatedAt: Date.now() - ageMs }),
+      );
+    await insert("reminder:old-queued", "queued", 20 * 60_000);
+    await insert("reminder:old-sending", "sending", 20 * 60_000);
+    await insert("reminder:fresh-sending", "sending", 60_000);
+    await insert("reminder:old-sent", "sent", 20 * 60_000);
+
+    expect(await t.mutation(internal.automation.expireStuck, {})).toBe(2);
+    const statuses = Object.fromEntries((await events()).map((event) => [event.idempotencyKey, event.status]));
+    expect(statuses).toEqual({
+      "reminder:old-queued": "failed",
+      "reminder:old-sending": "failed",
+      "reminder:fresh-sending": "sending",
+      "reminder:old-sent": "sent",
+    });
   });
 });
 
@@ -235,6 +266,23 @@ describe("outbound notifications", () => {
     expect(await events()).toMatchObject([
       { status: "failed", detail: expect.stringContaining("Gave up after 5 attempts") },
     ]);
+    vi.unstubAllGlobals();
+  });
+
+  test("a permanent 4xx is recorded at once instead of retried", async () => {
+    const fetchMock = vi.fn(async () => new Response("unauthorized", { status: 401 }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubEnv("N8N_REQUEST_WEBHOOK_URL", "http://n8n.test/hook");
+    vi.stubEnv("CONVEX_TO_N8N_SECRET", "out-secret");
+
+    const alice = await signIn(t, "alice");
+    const bob = await signIn(t, "bob");
+    const toolId = await alice.client.mutation(api.tools.create, newTool);
+    await bob.client.mutation(api.loans.request, { toolId, ...futureRange(1, 2) });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(await events()).toMatchObject([{ status: "failed", detail: "Not retried: n8n responded 401" }]);
     vi.unstubAllGlobals();
   });
 

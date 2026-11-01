@@ -25,6 +25,8 @@ for (const name of readdirSync("n8n/workflows")) {
   const raw = readFileSync(file, "utf8");
   if (/\$env\b/.test(raw)) problems.push(`${file}: reads $env`);
   if (/hmacSecret/i.test(raw)) problems.push(`${file}: mentions hmacSecret`);
+  // An export from the n8n UI carries the real Convex address; restore the placeholder.
+  if (/CONVEX_SITE_URL = '(?!__CONVEX_SITE_URL__')/.test(raw)) problems.push(`${file}: set CONVEX_SITE_URL back to '__CONVEX_SITE_URL__'`);
   // A long hex or base64 run is what a pasted secret looks like.
   if (/[A-Fa-f0-9]{40,}|[A-Za-z0-9+/]{48,}={0,2}/.test(raw)) problems.push(`${file}: contains a long token`);
   // n8n's CLI exports an array, while the committed files hold a single workflow.

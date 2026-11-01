@@ -18,16 +18,18 @@ function signedRoute(handler: (ctx: ActionCtx, rawBody: string) => Promise<Respo
   return httpAction(async (ctx, request) => {
     const bytes = new Uint8Array(await request.arrayBuffer());
     if (bytes.length > MAX_BODY_BYTES) return json({ error: "too_large" }, 413);
+    const path = new URL(request.url).pathname;
 
     const result = await verifyPayload({
       secret: process.env.N8N_TO_CONVEX_SECRET ?? "",
       timestamp: request.headers.get(TIMESTAMP_HEADER),
       signature: request.headers.get(SIGNATURE_HEADER),
       rawBody: bytes,
+      scope: `${request.method} ${path}`,
     });
     if (!result.ok) {
       // The reason goes to our logs only, so callers learn nothing about why they failed.
-      console.warn(`[http] rejected ${new URL(request.url).pathname}: ${result.reason}`);
+      console.warn(`[http] rejected ${path}: ${result.reason}`);
       return json({ error: "unauthorized" }, 401);
     }
     return handler(ctx, new TextDecoder().decode(bytes));

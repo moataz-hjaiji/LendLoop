@@ -43,7 +43,7 @@
       "parameters": {
         "mode": "runOnceForEachItem",
         "language": "javaScript",
-        "jsCode": "// The one place that knows Convex's address. Not a secret, so it lives here rather\n// than read from the environment: env access stays blocked for every n8n expression.\nconst CONVEX_SITE_URL = 'http://host.docker.internal:3211';\n\n// Called again on each retry, so every attempt gets a fresh timestamp and signature.\nconst body = $json.body ?? '';\nconst timestamp = String(Math.floor(Date.now() / 1000));\nreturn {\n  method: $json.method,\n  url: CONVEX_SITE_URL + $json.path,\n  path: $json.path,\n  body,\n  context: $json.context ?? null,\n  attempt: ($json.attempt ?? 0) + 1,\n  timestamp,\n  // Must match convex/lib/hmac.ts: \"<unix seconds>.<raw body>\"\n  signingInput: `${timestamp}.${body}`,\n};"
+        "jsCode": "// npm run n8n:import replaces this placeholder with CONVEX_SITE_URL from .env, so the\n// address is configuration, not part of the export. Env access stays blocked in n8n.\nconst CONVEX_SITE_URL = '__CONVEX_SITE_URL__';\n\n// Called again on each retry, so every attempt gets a fresh timestamp and signature.\nconst body = $json.body ?? '';\nconst timestamp = String(Math.floor(Date.now() / 1000));\nreturn {\n  method: $json.method,\n  url: CONVEX_SITE_URL + $json.path,\n  path: $json.path,\n  body,\n  context: $json.context ?? null,\n  attempt: ($json.attempt ?? 0) + 1,\n  timestamp,\n  // Must match convex/lib/hmac.ts: the route is signed too, so a captured request\n  // cannot be replayed against another endpoint.\n  signingInput: `${timestamp}.${$json.method} ${$json.path}.${body}`,\n};"
       }
     },
     {

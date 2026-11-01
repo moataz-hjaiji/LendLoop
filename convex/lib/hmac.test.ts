@@ -64,6 +64,14 @@ describe("HMAC sign and verify", () => {
     expect(await verify(overrides)).toEqual({ ok: false, reason: "malformed" });
   });
 
+  test("a signed route only verifies for that route", async () => {
+    const signature = await signPayload(secret, timestamp, rawBody, "POST /n8n/activity");
+    const check = (scope?: string) => verifyPayload({ secret, timestamp, signature, rawBody, scope, nowSeconds: now });
+    expect(await check("POST /n8n/activity")).toEqual({ ok: true });
+    expect(await check("GET /n8n/overdue-loans")).toEqual({ ok: false, reason: "bad_signature" });
+    expect(await check()).toEqual({ ok: false, reason: "bad_signature" });
+  });
+
   test("a string and its UTF-8 bytes sign identically, including non-ASCII", async () => {
     const body = '{"tool":"Sägeblatt 🔧"}';
     expect(await signPayload(secret, timestamp, body)).toBe(
