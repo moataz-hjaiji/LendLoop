@@ -1,9 +1,13 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 import { AvailabilityBadge } from "@/components/availability-badge";
+import { CategoryTile } from "@/components/category-icon";
 import { ConfirmButton } from "@/components/confirm-button";
+import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
 import { ToolFormDialog } from "@/components/tool-form-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,29 +22,35 @@ export default function MyListingsPage() {
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">My listings</h1>
-        <Button onClick={() => setListing(true)}>List a tool</Button>
-      </div>
+      <PageHeader
+        title="My listings"
+        description="The tools you are offering to neighbors."
+        action={
+          <Button onClick={() => setListing(true)}>
+            <Plus aria-hidden /> List a tool
+          </Button>
+        }
+      />
 
-      {tools === undefined && <p className="mt-6 text-muted-foreground">Loading…</p>}
-      {tools?.length === 0 && (
-        <p className="mt-6 text-muted-foreground">You have not listed anything yet. What is sitting in your garage?</p>
-      )}
+      {tools === undefined && <p className="text-muted-foreground">Loading…</p>}
+      {tools?.length === 0 && <EmptyState message="You have not listed anything yet. What is sitting in your garage?" />}
 
-      <ul className="mt-6 grid gap-3">
+      <ul className="grid gap-3">
         {tools?.map(({ availability, ...tool }) => (
           <li key={tool._id}>
             <Card>
               <CardContent className="flex flex-wrap items-center justify-between gap-4">
-                <div className="min-w-0 space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{tool.name}</span>
-                    <AvailabilityBadge availability={availability} />
+                <div className="flex min-w-0 items-center gap-3">
+                  <CategoryTile category={tool.category} />
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold">{tool.name}</span>
+                      <AvailabilityBadge availability={availability} />
+                    </div>
+                    <p className="text-sm capitalize text-muted-foreground">
+                      {tool.category} · {tool.condition}
+                    </p>
                   </div>
-                  <p className="text-sm capitalize text-muted-foreground">
-                    {tool.category} · {tool.condition}
-                  </p>
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => setEditing(tool)}>

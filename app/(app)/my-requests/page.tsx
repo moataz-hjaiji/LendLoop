@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from "convex/react";
 import { ActionButton } from "@/components/action-button";
 import { LoanList } from "@/components/loan-list";
+import { PageHeader } from "@/components/page-header";
 import { api } from "@/convex/_generated/api";
 
 export default function MyRequestsPage() {
@@ -11,7 +12,7 @@ export default function MyRequestsPage() {
 
   return (
     <>
-      <h1 className="mb-6 text-2xl font-semibold tracking-tight">My requests</h1>
+      <PageHeader title="My requests" description="What you have asked to borrow, and where each request stands." />
       <LoanList
         loans={loans}
         show="lender"

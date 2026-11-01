@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from "convex/react";
 import { ActionButton } from "@/components/action-button";
 import { LoanList } from "@/components/loan-list";
+import { PageHeader } from "@/components/page-header";
 import { api } from "@/convex/_generated/api";
 
 export default function IncomingPage() {
@@ -13,7 +14,7 @@ export default function IncomingPage() {
 
   return (
     <>
-      <h1 className="mb-6 text-2xl font-semibold tracking-tight">Incoming requests</h1>
+      <PageHeader title="Incoming requests" description="Neighbors asking to borrow your tools." />
       <LoanList
         loans={loans}
         show="borrower"

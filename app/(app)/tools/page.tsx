@@ -2,11 +2,14 @@
 
 import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
+import { BadgeCheck, Plus } from "lucide-react";
 import { useState } from "react";
 import { AvailabilityBadge } from "@/components/availability-badge";
 import { BorrowDialog } from "@/components/borrow-dialog";
+import { CategoryTile } from "@/components/category-icon";
+import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
 import { ToolFormDialog } from "@/components/tool-form-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { api } from "@/convex/_generated/api";
@@ -22,20 +25,25 @@ export default function ToolsPage() {
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">All tools</h1>
-        <Button onClick={() => setListing(true)}>List a tool</Button>
-      </div>
+      <PageHeader
+        title="All tools"
+        description="Everything your neighbors are happy to lend."
+        action={
+          <Button onClick={() => setListing(true)}>
+            <Plus aria-hidden /> List a tool
+          </Button>
+        }
+      />
 
-      <div role="group" aria-label="Filter by category" className="mt-5 flex flex-wrap gap-2">
-        <Button size="sm" variant={category ? "outline" : "default"} aria-pressed={!category} onClick={() => setCategory(undefined)}>
+      <div role="group" aria-label="Filter by category" className="flex flex-wrap gap-2">
+        <Button size="sm" className="rounded-full" variant={category ? "outline" : "default"} aria-pressed={!category} onClick={() => setCategory(undefined)}>
           All
         </Button>
         {CATEGORIES.map((option) => (
           <Button
             key={option}
             size="sm"
-            className="capitalize"
+            className="rounded-full capitalize"
             variant={category === option ? "default" : "outline"}
             aria-pressed={category === option}
             onClick={() => setCategory(option)}
@@ -45,38 +53,48 @@ export default function ToolsPage() {
         ))}
       </div>
 
-      {tools === undefined && <p className="mt-6 text-muted-foreground">Loading…</p>}
-      {tools?.length === 0 && <p className="mt-6 text-muted-foreground">No tools in this category yet.</p>}
-
-      <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {tools?.map((tool) => (
-          <li key={tool._id}>
-            <Card className="h-full">
-              <CardContent className="flex h-full flex-col gap-2">
-                <div className="flex items-start justify-between gap-2">
-                  <h2 className="font-medium">{tool.name}</h2>
-                  <AvailabilityBadge availability={tool.availability} />
-                </div>
-                <p className="text-sm capitalize text-muted-foreground">
-                  {tool.category} · {tool.condition}
-                </p>
-                <p className="flex-1 text-sm">{tool.description}</p>
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-                  <span className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                    {tool.isMine ? "Your listing" : tool.ownerName}
-                    {tool.ownerTrusted && <Badge variant="outline">Trusted Lender</Badge>}
-                  </span>
-                  {!tool.isMine && (
-                    <Button size="sm" variant="outline" onClick={() => setBorrowing(tool)}>
-                      Request to borrow
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </li>
-        ))}
-      </ul>
+      <div className="mt-6">
+        {tools === undefined && <p className="text-muted-foreground">Loading…</p>}
+        {tools?.length === 0 && <EmptyState message="No tools in this category yet." />}
+        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {tools?.map((tool) => (
+            <li key={tool._id}>
+              <Card className="h-full transition-shadow hover:shadow-md">
+                <CardContent className="flex h-full flex-col gap-3">
+                  <div className="flex items-start gap-3">
+                    <CategoryTile category={tool.category} />
+                    <div className="min-w-0 flex-1">
+                      <h2 className="font-semibold">{tool.name}</h2>
+                      <p className="text-sm capitalize text-muted-foreground">
+                        {tool.category} · {tool.condition}
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <AvailabilityBadge availability={tool.availability} />
+                  </div>
+                  <p className="flex-1 text-sm">{tool.description}</p>
+                  <div className="flex items-center justify-between gap-2 border-t pt-3">
+                    <span className="min-w-0 text-sm text-muted-foreground">
+                      <span className="block truncate">{tool.isMine ? "Your listing" : tool.ownerName}</span>
+                      {tool.ownerTrusted && (
+                        <span className="flex items-center gap-1 text-xs font-medium text-primary">
+                          <BadgeCheck aria-hidden className="size-3.5" /> Trusted Lender
+                        </span>
+                      )}
+                    </span>
+                    {!tool.isMine && (
+                      <Button size="sm" variant="outline" className="shrink-0" onClick={() => setBorrowing(tool)}>
+                        Request to borrow
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       {borrowing && <BorrowDialog tool={borrowing} onClose={() => setBorrowing(undefined)} />}
       {/* Clear the filter so a new tool in another category is not hidden. */}

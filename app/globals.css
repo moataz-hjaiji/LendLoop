@@ -49,31 +49,31 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
+  --background: #faf9f6;
+  --foreground: #1c1917;
+  --card: #ffffff;
+  --card-foreground: #1c1917;
+  --popover: #ffffff;
+  --popover-foreground: #1c1917;
   /* #047857 on white is 5.5:1, which passes WCAG AA for text. */
   --primary: #047857;
   --primary-foreground: #ffffff;
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --secondary: #f1f0ec;
+  --secondary-foreground: #292524;
+  --muted: #f1f0ec;
+  --muted-foreground: #57534e;
+  --accent: #ecfdf5;
+  --accent-foreground: #065f46;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
+  --border: #e7e5df;
+  --input: #d9d6cf;
   --ring: #047857;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
+  --radius: 0.75rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -128,4 +128,10 @@
   html {
     @apply font-sans;
   }
+}
+
+.hero-glow {
+  background:
+    radial-gradient(60rem 26rem at 50% -8rem, rgb(4 120 87 / 0.13), transparent 70%),
+    radial-gradient(30rem 16rem at 88% 4rem, rgb(217 119 6 / 0.08), transparent 70%);
 }

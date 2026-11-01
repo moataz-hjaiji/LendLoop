@@ -5,6 +5,9 @@ import { useMutation, useQuery } from "convex/react";
 import { ActionButton } from "@/components/action-button";
 import { ConfirmButton } from "@/components/confirm-button";
 import { LoanList } from "@/components/loan-list";
+import { PageHeader } from "@/components/page-header";
+import { SOFT_GREEN } from "@/components/availability-badge";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -28,7 +31,9 @@ function Automation() {
         {events.map((event) => (
           <TableRow key={event._id}>
             <TableCell>
-              <Badge variant={event.status === "failed" ? "destructive" : "secondary"}>{event.status}</Badge>
+              <Badge variant={event.status === "failed" ? "destructive" : "secondary"} className={event.status === "sent" ? SOFT_GREEN : undefined}>
+                {event.status}
+              </Badge>
             </TableCell>
             <TableCell>{event.kind.replace("_", " ")}</TableCell>
             <TableCell className="max-w-md whitespace-normal break-words">
@@ -130,7 +135,7 @@ export default function AdminPage() {
 
   return (
     <>
-      <h1 className="mb-6 text-2xl font-semibold tracking-tight">Admin</h1>
+      <PageHeader title="Admin" description="Moderate the board and watch the automation." />
       <Tabs defaultValue="automation">
         <TabsList>
           <TabsTrigger value="automation">Automation</TabsTrigger>
@@ -138,10 +143,10 @@ export default function AdminPage() {
           <TabsTrigger value="listings">Listings</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
         </TabsList>
-        <TabsContent value="automation" className="pt-4"><Automation /></TabsContent>
+        <TabsContent value="automation" className="pt-4"><Card className="px-2"><Automation /></Card></TabsContent>
         <TabsContent value="loans" className="pt-4"><AllLoans /></TabsContent>
-        <TabsContent value="listings" className="pt-4"><Listings /></TabsContent>
-        <TabsContent value="users" className="pt-4"><Users /></TabsContent>
+        <TabsContent value="listings" className="pt-4"><Card className="px-2"><Listings /></Card></TabsContent>
+        <TabsContent value="users" className="pt-4"><Card className="px-2"><Users /></Card></TabsContent>
       </Tabs>
     </>
   );

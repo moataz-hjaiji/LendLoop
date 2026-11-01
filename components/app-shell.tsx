@@ -5,6 +5,7 @@ import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { Logo } from "@/components/logo";
 import { api } from "@/convex/_generated/api";
 import { errorMessage } from "@/lib/errors";
 import { cn } from "@/lib/utils";
@@ -47,11 +48,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <header className="border-b">
+      <header className="sticky top-0 z-10 border-b bg-background/85 backdrop-blur">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-          <Link href="/" className="font-semibold tracking-tight">
-            LendLoop
-          </Link>
+          <Logo />
           <nav aria-label="Main" className="order-last flex w-full gap-1 overflow-x-auto sm:order-none sm:w-auto">
             {links.map(({ href, label }) => (
               <Link
@@ -59,8 +58,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                 href={href}
                 aria-current={pathname === href ? "page" : undefined}
                 className={cn(
-                  "whitespace-nowrap rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                  pathname === href && "bg-muted font-medium text-foreground",
+                  "whitespace-nowrap rounded-full px-3.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                  pathname === href && "bg-accent font-medium text-accent-foreground hover:bg-accent hover:text-accent-foreground",
                 )}
               >
                 {label}
