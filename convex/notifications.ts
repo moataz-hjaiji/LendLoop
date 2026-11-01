@@ -60,6 +60,7 @@ export const deliver = internalAction({
   },
   handler: async (ctx, { payload, attempt }) => {
     let failure: string;
+    let permanent = false;
     try {
       const url = process.env.N8N_REQUEST_WEBHOOK_URL;
       const secret = process.env.CONVEX_TO_N8N_SECRET;
@@ -80,11 +81,14 @@ export const deliver = internalAction({
       });
       if (response.ok) return;
       failure = `n8n responded ${response.status}`;
+      // A 4xx such as 401 (secret mismatch) fails the same way every time, so retrying
+      // only adds noise. Timeouts and rate limits are the exceptions. n8n uses the same rule.
+      permanent = response.status >= 400 && response.status < 500 && ![408, 429].includes(response.status);
     } catch (error) {
       failure = error instanceof Error ? error.message : String(error);
     }
 
-    if (attempt < MAX_ATTEMPTS) {
+    if (!permanent && attempt < MAX_ATTEMPTS) {
       // Exponential backoff with jitter: about 5s, 15s, 45s, 2m15s.
       const delayMs = 5_000 * 3 ** (attempt - 1) * (0.8 + Math.random() * 0.4);
       console.warn(`[notify] ${payload.eventId} attempt ${attempt} failed: ${failure}`);
@@ -96,7 +100,7 @@ export const deliver = internalAction({
       idempotencyKey: payload.eventId,
       kind: "notification",
       status: "failed",
-      detail: `Gave up after ${attempt} attempts: ${failure}`,
+      detail: permanent ? `Not retried: ${failure}` : `Gave up after ${attempt} attempts: ${failure}`,
     });
   },
 });

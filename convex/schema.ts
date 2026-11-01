@@ -62,5 +62,6 @@ export default defineSchema({
   })
     .index("by_key", ["idempotencyKey"])
     .index("by_loan", ["loanId"])
-    .index("by_updatedAt", ["updatedAt"]),
+    .index("by_updatedAt", ["updatedAt"])
+    .index("by_status_updatedAt", ["status", "updatedAt"]),
 });
