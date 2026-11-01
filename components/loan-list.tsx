@@ -9,10 +9,9 @@ export type LoanRow = FunctionReturnType<typeof api.loans.listAll>[number];
 type Activity = LoanRow["activity"][number];
 
 const KIND_LABEL = { notification: "Notification", reminder: "Reminder", workflow_error: "Workflow" };
-const STATUS_LABEL = { queued: "queued", sending: "sending", sent: "sent", failed: "failed" };
 
 function activityText({ kind, status, updatedAt }: Activity) {
-  return `${KIND_LABEL[kind]} ${STATUS_LABEL[status]} ${formatDistanceToNow(updatedAt, { addSuffix: true })}`;
+  return `${KIND_LABEL[kind]} ${status} ${formatDistanceToNow(updatedAt, { addSuffix: true })}`;
 }
 
 function StatusBadge({ loan }: { loan: LoanRow }) {

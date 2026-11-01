@@ -1,20 +1,4 @@
-import { v } from "convex/values";
-
-export const CATEGORIES = [
-  "power tools",
-  "hand tools",
-  "garden",
-  "kitchen",
-  "camping",
-  "cleaning",
-  "other",
-] as const;
-export const CONDITIONS = ["like new", "good", "fair", "worn"] as const;
-
-export type Category = (typeof CATEGORIES)[number];
-export type Condition = (typeof CONDITIONS)[number];
-export type LoanStatus = "pending" | "approved" | "declined" | "cancelled" | "returned";
-export type EventStatus = "queued" | "sending" | "sent" | "failed";
+import { v, type Infer } from "convex/values";
 
 export const roleValidator = v.union(v.literal("admin"), v.literal("user"));
 export const categoryValidator = v.union(
@@ -50,3 +34,20 @@ export const eventStatusValidator = v.union(
   v.literal("sent"),
   v.literal("failed"),
 );
+
+export type Category = Infer<typeof categoryValidator>;
+export type Condition = Infer<typeof conditionValidator>;
+export type LoanStatus = Infer<typeof loanStatusValidator>;
+export type EventStatus = Infer<typeof eventStatusValidator>;
+
+// Typed against the validators, so an option the server would reject does not compile.
+export const CATEGORIES: readonly Category[] = [
+  "power tools",
+  "hand tools",
+  "garden",
+  "kitchen",
+  "camping",
+  "cleaning",
+  "other",
+];
+export const CONDITIONS: readonly Condition[] = ["like new", "good", "fair", "worn"];

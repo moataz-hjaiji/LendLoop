@@ -1,14 +1,9 @@
 // Loads credentials and workflows into the running n8n container, then publishes them.
 // Credentials come from .env over stdin, so secrets never appear in a file in this repo.
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 
-const env = Object.fromEntries(
-  readFileSync(".env", "utf8")
-    .split("\n")
-    .filter((line) => /^[A-Z0-9_]+=/.test(line))
-    .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]),
-);
+process.loadEnvFile(".env");
+const { env } = process;
 
 const inContainer = (script, input) =>
   execFileSync("docker", ["compose", "exec", "-T", "n8n", "sh", "-c", script], {

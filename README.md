@@ -216,7 +216,7 @@ Secrets live in `.env` (gitignored), Convex environment variables and n8n creden
 | Path | Strategy |
 |---|---|
 | Convex to n8n | 5 attempts over about 3 minutes, exponential with jitter, re-signed each time. Then the event is marked `failed` |
-| n8n to Convex | 4 attempts at 2s, 4s and 8s, re-signed each time. Then the run fails |
+| n8n to Convex | 4 attempts at 2s, 4s and 8s, re-signed each time. A 4xx other than 408 or 429 fails at once, as a retry cannot help. Then the run fails |
 
 n8n's built-in Retry On Fail waits a fixed interval, so backoff is a small loop in the Signed Request sub-workflow.
 

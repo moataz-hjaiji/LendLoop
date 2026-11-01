@@ -1,15 +1,10 @@
 // Sends webhooks to n8n the way Convex does, including attacks that must be rejected.
 //   node scripts/send-test-webhook.mjs <valid|replay|forged|stale|reserialized|tampered>
 // Imports the app's real signing code. Node 22.18+ runs the .ts file directly.
-import { readFileSync } from "node:fs";
 import { SIGNATURE_HEADER, signPayload, TIMESTAMP_HEADER } from "../convex/lib/hmac.ts";
 
-const env = Object.fromEntries(
-  readFileSync(".env", "utf8")
-    .split("\n")
-    .filter((line) => /^[A-Z0-9_]+=/.test(line))
-    .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]),
-);
+process.loadEnvFile(".env");
+const { env } = process;
 const mode = process.argv[2] ?? "valid";
 const payload = {
   eventId: `notify:test${Date.now()}:pending`,
