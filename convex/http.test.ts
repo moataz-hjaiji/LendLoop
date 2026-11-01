@@ -155,7 +155,7 @@ describe("idempotent write-back", () => {
 
 describe("outbound notifications", () => {
   test("a status change queues a ledger row and a minimal payload for the right person", async () => {
-    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => new Response("{}", { status: 202 }));
+    const fetchMock = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(async () => new Response("{}", { status: 202 }));
     vi.stubGlobal("fetch", fetchMock);
     vi.stubEnv("N8N_REQUEST_WEBHOOK_URL", "http://n8n.test/hook");
     vi.stubEnv("CONVEX_TO_N8N_SECRET", "out-secret");

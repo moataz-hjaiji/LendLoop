@@ -38,6 +38,9 @@ yarn-error.log*
 # local Convex backend data
 .convex/
 
+# Clerk keyless dev credentials
+.clerk/
+
 # vercel
 .vercel
 
